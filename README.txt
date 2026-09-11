@@ -1,8 +1,19 @@
-Firebase config bağlandı.
+EROL KPSS • GERİ SAYIMLI FIREBASE SÜRÜMÜ
 
-GitHub'da mevcut index.html dosyasını bu paketteki index.html ile değiştir.
+Yeni:
+- 4 Ekim 2026 KPSS Önlisans için otomatik gün sayacı
+- Kalan konu sayısı
+- Tamamlanan konu sayısı
+- Kalan güne göre günlük soru hedefi
+- Son haftaya yaklaştıkça tempo önerisi otomatik değişir
 
-Son kontrol:
-Firebase Console > Firestore Database > Rules bölümünde /kpss için read/write izni olmalı ve Publish'e basılmış olmalı.
+Mevcut:
+- Firebase ortak takip
+- Erol çalışma modu
+- Nisu takip paneli
+- 50+ soru/konu
+- 12 pastel tema
+- yanlışlar / benzer soru / basit anlatım
 
-Erol soru çözdüğünde Firestore > Data altında kpss koleksiyonu oluşacaktır.
+GitHub:
+index.html dosyasını mevcut repo içindeki index.html ile değiştir.
