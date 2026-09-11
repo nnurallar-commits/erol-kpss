@@ -1,23 +1,27 @@
-EROL KPSS 2026 • KONU VE SORU DAĞILIMINA UYUMLU SÜRÜM
+EROL KPSS • GELİŞMİŞ ÖĞRENME + NİSU PANELİ
 
-Sınav yapısı:
-Türkçe 30
-Matematik-Geometri 30
-Tarih 27
-Coğrafya 18
-Vatandaşlık 9
-Güncel Bilgiler 6
-Toplam 120 soru / 130 dakika
+Yeni özellikler:
+1) “Hiç anlamadım” modu
+   - Soruyu daha küçük/basit bir örnekle açıklar
+   - Ardından mini alıştırma verir
+   - Mini alıştırmanın cevabını anında kontrol eder
 
-Bu sürümde:
-- Konular 2026 Önlisans konu listesine göre yeniden gruplandı.
-- Ağırlığı yüksek konulara daha yüksek soru hedefi verildi.
-- 120 soruluk tam deneme gerçek ders dağılımıyla oluşturulur.
-- Günlük plan ağırlığı yüksek ve bitmemiş konuları öne taşır.
-- 12 pastel tema
-- Firebase ortak takip / Nisu paneli
-- Sınava geri sayım
-- Her konuda 60+ pratik soru hedefi
-- Basit anlatım ve şık açıklaması
+2) “Neden bu şık değil?” sistemi
+   - Her seçeneği ayrı ayrı açıklar
+   - Ders türüne göre yanlış şık gerekçesi verir
+   - Doğru şıkkın neden doğru olduğunu ayrıca belirtir
 
-Not: Alt konu soru sayıları geçmiş sınav analizlerine dayalı yaklaşık ağırlıklardır; ÖSYM her alt konu için sabit soru sayısı taahhüt etmez.
+3) Nisu takip paneli
+   - Bugün çözülen soru
+   - Doğru / yanlış
+   - Günlük doğruluk
+   - Yaklaşık aktif çalışma dakikası
+   - Bugün hangi konuları çalıştı
+   - Konu başına kaç soru çözdü
+   - Bugün zorlandığı/yanlış yaptığı son sorular
+   - İşaretlediği şık ve doğru cevap
+   - Biten konu sayısı
+   - Firebase üzerinden ortak senkron
+
+GitHub:
+ZIP içindeki index.html dosyasını erol-kpss reposundaki mevcut index.html ile değiştir.
