@@ -164,14 +164,27 @@ function countdown(){const exam=new Date("2026-10-04T10:15:00+03:00");$("#days")
 function subs(){const a=["Tümü",...Object.keys(EXAM)];$("#subs").innerHTML=a.map(s=>`<button class="sub ${s===selected?"active":""}" data-s="${s}"><span>${s}</span><b>${s==="Tümü"?DATA.length:DATA.filter(x=>x.subject===s).length}</b></button>`).join("");document.querySelectorAll(".sub").forEach(b=>b.onclick=()=>{selected=b.dataset.s;subs();render()})}
 
 function masteryFor(topic){
- const hist=((state.topicHistory&&state.topicHistory[topic])||[]).slice(-20);
- const solved=hist.length;
- const correct=hist.filter(Boolean).length;
- const pct=solved?Math.round(correct/solved*100):0;
- if(solved<10)return {label:"🟨 gelişiyor",cls:"masteryGrowing",pct,solved};
- if(pct>=80)return {label:"🟩 öğrendi",cls:"masteryLearned",pct,solved};
- if(pct>=60)return {label:"🟨 gelişiyor",cls:"masteryGrowing",pct,solved};
- return {label:"🟥 zayıf",cls:"masteryWeak",pct,solved};
+ const all=(state.topicHistory&&state.topicHistory[topic])||[];
+ const recent=all.slice(-20);
+ const totalSolved=all.length;
+ const recentCorrect=recent.filter(Boolean).length;
+ const recentPct=recent.length?Math.round(recentCorrect/recent.length*100):0;
+
+ // 10/10 yapınca “öğrendi” demiyoruz.
+ // Öğrendi için en az 30 toplam soru + son 20 soruda en az %80 gerekir.
+ if(totalSolved<10){
+   return {label:"⬜ yeni başladı",cls:"masteryGrowing",pct:recentPct,solved:totalSolved};
+ }
+ if(totalSolved<30){
+   return {label:"🟨 gelişiyor",cls:"masteryGrowing",pct:recentPct,solved:totalSolved};
+ }
+ if(recent.length>=20 && recentPct>=80){
+   return {label:"🟩 öğrendi",cls:"masteryLearned",pct:recentPct,solved:totalSolved};
+ }
+ if(recentPct>=60){
+   return {label:"🟨 gelişiyor",cls:"masteryGrowing",pct:recentPct,solved:totalSolved};
+ }
+ return {label:"🟥 zayıf",cls:"masteryWeak",pct:recentPct,solved:totalSolved};
 }
 function syncLearnedState(topic){
  const t=DATA.find(x=>x.topic===topic);
@@ -197,7 +210,7 @@ function render(list=null){
      <span class="masteryBadge ${m.cls}">${m.label} • %${m.pct}</span>
      <span class="chip">${done?"tamamlandı ✓":"çalışılıyor"}</span>
    </div>
-   <div class="masteryNote">Son ${m.solved}/20 soru baz alınır. 🟩 Öğrendi için en az 10 soru ve %80 başarı gerekir; oran düşerse statü geri alınır.</div>
+   <div class="masteryNote">Toplam ${m.solved} soru çözüldü. 🟩 Öğrendi için en az 30 soru + son 20 soruda %80 gerekir; başarı düşerse statü geri alınır.</div>
    <div class="topicActions"><button class="open" onclick="openTopic(${x.id})">konuyu aç</button><button class="tick" onclick="toggle(${x.id})">${done?"✓":"○"}</button></div>
    </article>`;
  }).join("")
@@ -206,7 +219,7 @@ window.toggle=id=>{
  const t=DATA.find(x=>x.id===id),m=masteryFor(t.topic);
  if(state.done.includes(id)){state.done=state.done.filter(x=>x!==id);save();render();return}
  if(m.label!=="🟩 öğrendi"){
-   alert(`Bu konu henüz “öğrendi” seviyesinde değil. Son ${m.solved}/20 soru • başarı %${m.pct}. Tamamlamak için en az 10 soru ve %80 gerekir.`);
+   alert(`Bu konu henüz “öğrendi” seviyesinde değil. Toplam ${m.solved} soru • son performans %${m.pct}. Tamamlamak için en az 30 soru ve son 20 soruda %80 gerekir.`);
    return;
  }
  state.done.push(id);save();render();
@@ -308,7 +321,7 @@ window.answer=i=>{
  state.topicStats[topicName].solved++; if(isCorrect)state.topicStats[topicName].correct++;
  state.topicHistory[topicName]=state.topicHistory[topicName]||[];
  state.topicHistory[topicName].push(isCorrect);
- state.topicHistory[topicName]=state.topicHistory[topicName].slice(-20);
+ state.topicHistory[topicName]=state.topicHistory[topicName].slice(-200);
  syncLearnedState(topicName);
  if(examSession&&examSession.active){
    examSession.byTopic[topicName]=examSession.byTopic[topicName]||{solved:0,correct:0,subject:subjectName};
