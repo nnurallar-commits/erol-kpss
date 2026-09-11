@@ -73,6 +73,33 @@ button,select,input{font:inherit}.shell{max-width:1240px;margin:auto;padding:16p
 .geoFeedback{margin-top:10px;padding:10px;border-radius:10px;background:var(--a2)}
 @media(max-width:800px){.atlasBottom{grid-template-columns:1fr}}
 
+
+.atlasShell{display:grid;gap:14px}
+.atlasTop{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.atlasMap{border:1px solid var(--line);background:linear-gradient(180deg,#edf6f7 0%,#f9faf5 100%);border-radius:18px;padding:10px;overflow:hidden}
+.atlasSvg{width:100%;height:auto;display:block;min-height:360px}
+.atlasSea{font-size:14px;letter-spacing:2.2px;font-weight:900;fill:#7897a0}
+.atlasCountry{fill:#fbfaf4;stroke:#53645f;stroke-width:2.3}
+.atlasCoast{fill:none;stroke:#53645f;stroke-width:2.3}
+.atlasPoint{cursor:pointer}
+.atlasPoint circle{fill:var(--a);stroke:#fff;stroke-width:3}
+.atlasPoint text{font-size:13px;font-weight:900;fill:#24322d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.atlasPoint:hover circle{r:8}
+.atlasBottom{display:grid;grid-template-columns:1.05fr .95fr;gap:12px}
+.atlasInfo,.atlasQuiz{border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:15px}
+.atlasInfo h4,.atlasQuiz h4{margin:0 0 10px}
+.atlasPills{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.atlasPill{font-size:12px;padding:8px 9px;border:1px solid var(--line);background:var(--panel);border-radius:11px;line-height:1.35}
+.geoFeedback{margin-top:10px;padding:10px;border-radius:10px;background:var(--a2)}
+.mapTab{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 12px;border-radius:12px;font-weight:900;cursor:pointer}
+.mapTab.on{background:var(--a2);color:var(--a);border-color:transparent}
+.geoDialog{width:min(1120px,96vw)!important}
+@media(max-width:800px){
+ .atlasBottom{grid-template-columns:1fr}
+ .atlasPills{grid-template-columns:1fr}
+ .atlasSvg{min-height:280px}
+}
+
 </style>
 </head>
 <body data-theme="sage">
@@ -104,6 +131,7 @@ const state=JSON.parse(localStorage.getItem(KEY)||'{"done":[],"solved":0,"correc
 if(!Array.isArray(state.studyLog))state.studyLog=[];
 if(!Array.isArray(state.hardQuestions))state.hardQuestions=[];
 if(!state.topicStats||typeof state.topicStats!=="object")state.topicStats={};
+if(!state.topicHistory||typeof state.topicHistory!=="object")state.topicHistory={};
 if(!Array.isArray(state.examHistory))state.examHistory=[];
 if(!state.sessionStartedAt)state.sessionStartedAt=Date.now();
 let selected="Tümü",current=null,refs=[],qi=0,examSession=null;
@@ -121,7 +149,7 @@ if(Array.isArray(x.studyLog))state.studyLog=x.studyLog;
 if(Array.isArray(x.hardQuestions))state.hardQuestions=x.hardQuestions;
 if(x.sessionStartedAt)state.sessionStartedAt=x.sessionStartedAt;
 if(x.topicStats)state.topicStats=x.topicStats;
-if(x.topicHistory)state.topicHistory=x.topicHistory;
+if(x.topicHistory)state.topicHistory=x.topicHistory; else if(!state.topicHistory)state.topicHistory={};
 if(Array.isArray(x.examHistory))state.examHistory=x.examHistory;
 stats();render()})}
 function stats(){$("#doneN").textContent=state.done.length;$("#solvedN").textContent=state.solved;$("#acc").textContent=state.solved?`%${Math.round(state.correct/state.solved*100)}`:"%0";const d=state.daily[dayKey()]||{solved:0};$("#todayN").textContent=(d.solved||0)+" soru";$("#bar").style.width=Math.round(state.done.length/DATA.length*100)+"%"}
@@ -129,7 +157,7 @@ function countdown(){const exam=new Date("2026-10-04T10:15:00+03:00");$("#days")
 function subs(){const a=["Tümü",...Object.keys(EXAM)];$("#subs").innerHTML=a.map(s=>`<button class="sub ${s===selected?"active":""}" data-s="${s}"><span>${s}</span><b>${s==="Tümü"?DATA.length:DATA.filter(x=>x.subject===s).length}</b></button>`).join("");document.querySelectorAll(".sub").forEach(b=>b.onclick=()=>{selected=b.dataset.s;subs();render()})}
 
 function masteryFor(topic){
- const hist=(state.topicHistory[topic]||[]).slice(-20);
+ const hist=((state.topicHistory&&state.topicHistory[topic])||[]).slice(-20);
  const solved=hist.length;
  const correct=hist.filter(Boolean).length;
  const pct=solved?Math.round(correct/solved*100):0;
@@ -375,47 +403,54 @@ $("#parent").onclick=()=>{
 }
 
 
+
 const GEO_DATA={
- "Bölgeler":[["Marmara","Sanayi, limanlar, ulaşım ve nüfus yoğunluğu."],["Ege","Zeytin, incir, üzüm; enine kıyılar."],["Akdeniz","Turunçgil, seracılık, yaz kuraklığı."],["İç Anadolu","Tahıl, bozkır, karasal iklim."],["Karadeniz","Çay, fındık, yıl boyu yağış."],["Doğu Anadolu","Yüksek plato, sert karasal iklim."],["Güneydoğu Anadolu","GAP, pamuk, sıcak-kurak yaz."]],
+ "Bölgeler":[["Marmara","Sanayi, limanlar, ulaşım ve nüfus yoğunluğu."],["Ege","Zeytin, incir, üzüm; enine kıyılar."],["Akdeniz","Turunçgil, seracılık ve yaz kuraklığı."],["İç Anadolu","Tahıl, bozkır ve karasal iklim."],["Karadeniz","Çay, fındık, orman ve yıl boyu yağış."],["Doğu Anadolu","Yüksek plato, sert karasal iklim ve büyükbaş hayvancılık."],["Güneydoğu Anadolu","GAP, pamuk ve sıcak-kurak yaz."]],
  "Madenler":[["Taş kömürü","Zonguldak"],["Bor","Eskişehir-Kütahya-Balıkesir"],["Demir","Sivas-Malatya"],["Boksit","Seydişehir-Akseki"],["Krom","Elazığ-Guleman"]],
- "Tarım":[["Çay","Doğu Karadeniz"],["Fındık","Karadeniz"],["Zeytin","Ege-Marmara"],["Pamuk","Çukurova-Güneydoğu"],["Buğday","İç Anadolu"],["Muz","Akdeniz kıyıları"]],
- "İklim":[["Karadeniz","Her mevsim yağış"],["Akdeniz","Yaz sıcak-kurak"],["Karasal","İç kesimler"],["Sert karasal","Doğu Anadolu"]]
+ "Tarım":[["Çay","Doğu Karadeniz"],["Fındık","Orta ve Doğu Karadeniz"],["Zeytin","Ege-Marmara"],["Pamuk","Çukurova-Güneydoğu"],["Buğday","İç Anadolu"],["Muz","Akdeniz kıyıları"]],
+ "İklim":[["Karadeniz iklimi","Her mevsim yağış"],["Akdeniz iklimi","Yaz sıcak-kurak, kış ılık-yağışlı"],["Karasal","İç kesimler"],["Sert karasal","Doğu Anadolu"]]
 };
-const GEO_POINTS={
- "Bölgeler":[["Marmara",18,37],["Ege",21,59],["Akdeniz",47,72],["İç Anadolu",50,51],["Karadeniz",56,29],["Doğu Anadolu",81,44],["Güneydoğu Anadolu",78,65]],
- "Madenler":[["Taş kömürü",38,28],["Bor",34,50],["Demir",68,49],["Boksit",42,71],["Krom",70,58]],
- "Tarım":[["Çay",74,24],["Fındık",58,26],["Zeytin",22,57],["Pamuk",72,67],["Buğday",50,52],["Muz",39,73]],
- "İklim":[["Karadeniz",58,26],["Akdeniz",45,73],["Karasal",53,52],["Sert karasal",81,44]]
+const GEO_POINTS={"Marmara": [183.7, 138.6], "Ege": [155.8, 245.3], "Akdeniz": [341.5, 319.6], "İç Anadolu": [387.9, 217.5], "Karadeniz": [527.1, 124.7], "Doğu Anadolu": [759.2, 208.2], "Güneydoğu Anadolu": [712.8, 287.1], "Taş kömürü": [332.2, 103.8], "Bor": [239.4, 203.6], "Demir": [638.5, 231.4], "Boksit": [341.5, 291.7], "Krom": [675.6, 236.0], "Çay": [736.0, 124.7], "Fındık": [596.7, 129.3], "Zeytin": [141.9, 217.5], "Pamuk": [541.0, 305.7], "Buğday": [387.9, 217.5], "Muz": [341.5, 333.5], "Karadeniz iklimi": [550.3, 124.7], "Akdeniz iklimi": [318.3, 324.2], "Karasal": [411.1, 217.5], "Sert karasal": [805.6, 194.3]};
+const GEO_TAB_NAMES={
+ "Bölgeler":["Marmara","Ege","Akdeniz","İç Anadolu","Karadeniz","Doğu Anadolu","Güneydoğu Anadolu"],
+ "Madenler":["Taş kömürü","Bor","Demir","Boksit","Krom"],
+ "Tarım":["Çay","Fındık","Zeytin","Pamuk","Buğday","Muz"],
+ "İklim":["Karadeniz iklimi","Akdeniz iklimi","Karasal","Sert karasal"]
 };
 const GEO_QUIZ=[
- {q:"Taş kömürü için haritada hangi noktayı seçmelisin?",tab:"Madenler",a:"Taş kömürü",e:"Taş kömürü Zonguldak çevresinde çıkarılır."},
+ {q:"Taş kömürü için hangi noktayı seçmelisin?",tab:"Madenler",a:"Taş kömürü",e:"Taş kömürü Zonguldak çevresinde çıkarılır."},
  {q:"Çay üretimi için hangi noktayı seçmelisin?",tab:"Tarım",a:"Çay",e:"Çay özellikle Doğu Karadeniz'de yetişir."},
  {q:"Bor madeni için hangi noktayı seçmelisin?",tab:"Madenler",a:"Bor",e:"Bor Eskişehir-Kütahya-Balıkesir çevresinde öne çıkar."},
- {q:"Her mevsim yağışlı iklim için hangi noktayı seçmelisin?",tab:"İklim",a:"Karadeniz",e:"Karadeniz kıyılarında yıl boyunca yağış görülür."},
+ {q:"Her mevsim yağışlı iklim için hangi noktayı seçmelisin?",tab:"İklim",a:"Karadeniz iklimi",e:"Karadeniz kıyılarında yıl boyunca yağış görülür."},
  {q:"Tahıl ve bozkır denince hangi bölgeyi seçmelisin?",tab:"Bölgeler",a:"İç Anadolu",e:"İç Anadolu karasal iklim, bozkır ve tahılla öne çıkar."}
 ];
 let geoTab="Bölgeler",geoQuiz=GEO_QUIZ[0];
 
 function atlasHotspots(){
- return (GEO_POINTS[geoTab]||[]).map(([name,x,y])=>`<g class="atlasHotspot" onclick="geoPick('${name}')">
- <circle cx="${x*10}" cy="${y*4.7}" r="7"></circle>
- <text x="${x*10+12}" y="${y*4.7+4}">${name}</text></g>`).join("");
+ return (GEO_TAB_NAMES[geoTab]||[]).map(name=>{
+   const p=GEO_POINTS[name]; if(!p)return "";
+   return `<g class="atlasPoint" onclick="geoPick('${name}')">
+      <circle cx="${p[0]}" cy="${p[1]}" r="6.5"></circle>
+      <text x="${p[0]+11}" y="${p[1]-9}">${name}</text>
+   </g>`;
+ }).join("");
 }
 window.geoPick=name=>{
  const f=$("#geoFeedback"); if(!f)return;
  const ok=name===geoQuiz.a;
- f.innerHTML=`<div class="geoFeedback"><b>${ok?"Doğru ✓":"Olmadı"}</b><br>${ok?geoQuiz.e:"Aradığımız nokta: "+geoQuiz.a+". Tekrar dene."}</div>`;
+ f.innerHTML=`<div class="geoFeedback"><b>${ok?"Doğru ✓":"Olmadı"}</b><br>${ok?geoQuiz.e:"Bu soruda aradığımız yer “"+geoQuiz.a+"”. Etiketleri tekrar kontrol et."}</div>`;
 }
 function newGeoQuiz(){
  geoQuiz=GEO_QUIZ[Math.floor(Math.random()*GEO_QUIZ.length)];
- geoTab=geoQuiz.tab; drawGeo();
+ geoTab=geoQuiz.tab;drawGeo();
 }
 function drawGeo(){
  document.querySelectorAll(".mapTab").forEach(b=>b.classList.toggle("on",b.dataset.t===geoTab));
- const layer=$("#hotspotLayer"); if(layer)layer.innerHTML=atlasHotspots();
- const info=$("#atlasInfo"); if(info)info.innerHTML=`<h4>${geoTab}</h4><div class="atlasPills">${(GEO_DATA[geoTab]||[]).map(x=>`<span class="atlasPill"><b>${x[0]}</b> · ${x[1]}</span>`).join("")}</div>`;
- const q=$("#geoQuestion"); if(q)q.textContent=geoQuiz.q;
- const f=$("#geoFeedback"); if(f)f.innerHTML="";
+ const layer=$("#hotspotLayer");if(layer)layer.innerHTML=atlasHotspots();
+ const info=$("#atlasInfo");
+ if(info)info.innerHTML=`<h4>${geoTab}</h4><div class="atlasPills">${(GEO_DATA[geoTab]||[]).map(x=>`<div class="atlasPill"><b>${x[0]}</b><br>${x[1]}</div>`).join("")}</div>`;
+ const q=$("#geoQuestion");if(q)q.textContent=geoQuiz.q;
+ const f=$("#geoFeedback");if(f)f.innerHTML="";
 }
 window.setGeoTab=t=>{geoTab=t;drawGeo()}
 $("#geoMap").onclick=()=>{
@@ -424,23 +459,30 @@ $("#geoMap").onclick=()=>{
  geoTab=geoQuiz.tab;
  $("#body").innerHTML=`<div class="eyebrow">COĞRAFYA • ATLAS TEKRARI</div><h2>Türkiye harita modu</h2>
  <div class="atlasShell">
-  <div class="atlasTop">
-   <div class="mapTabs">${Object.keys(GEO_DATA).map(t=>`<button class="mapTab ${t===geoTab?"on":""}" data-t="${t}" onclick="setGeoTab('${t}')">${t}</button>`).join("")}</div>
-   <button class="btn accent" onclick="newGeoQuiz()">🎯 Haritada Sor</button>
-  </div>
-  <div class="atlasMap">
-   <svg class="atlasSvg" viewBox="0 0 1000 410" aria-label="Türkiye atlas tekrar haritası">
-    <text class="atlasSea" x="500" y="28" text-anchor="middle">KARADENİZ</text>
-    <text class="atlasSea" x="500" y="396" text-anchor="middle">AKDENİZ</text>
-    <text class="atlasSea" x="36" y="215" text-anchor="middle" transform="rotate(-90 36 215)">EGE DENİZİ</text>
-    <path class="atlasCountry" d="M95 157 L123 127 L170 120 L217 101 L266 104 L309 89 L356 96 L399 82 L445 92 L491 78 L538 88 L585 78 L632 93 L681 87 L730 102 L780 97 L826 115 L876 118 L914 138 L935 165 L921 191 L891 207 L858 223 L824 240 L783 239 L744 257 L702 257 L662 275 L619 278 L579 292 L535 287 L493 303 L451 294 L409 308 L369 298 L328 309 L290 292 L249 301 L208 282 L169 266 L132 243 L105 213 L92 184 Z"></path>
-    <g id="hotspotLayer"></g>
-   </svg>
-  </div>
-  <div class="atlasBottom">
-   <div class="atlasInfo" id="atlasInfo"></div>
-   <div class="atlasQuiz"><h4>🎯 Haritada Sor</h4><div id="geoQuestion"></div><div class="muted" style="margin-top:6px">Cevap vermek için haritadaki noktaya tıkla.</div><div id="geoFeedback"></div><button class="btn" style="margin-top:10px" onclick="newGeoQuiz()">başka soru</button></div>
-  </div>
+   <div class="atlasTop">
+     <div class="mapTabs">${Object.keys(GEO_DATA).map(t=>`<button class="mapTab ${t===geoTab?"on":""}" data-t="${t}" onclick="setGeoTab('${t}')">${t}</button>`).join("")}</div>
+     <button class="btn accent" onclick="newGeoQuiz()">🎯 Haritada Sor</button>
+   </div>
+   <div class="atlasMap">
+     <svg class="atlasSvg" viewBox="0 0 1000 410" aria-label="Türkiye coğrafya atlası">
+       <text class="atlasSea" x="520" y="25" text-anchor="middle">KARADENİZ</text>
+       <text class="atlasSea" x="500" y="398" text-anchor="middle">AKDENİZ</text>
+       <text class="atlasSea" x="32" y="220" text-anchor="middle" transform="rotate(-90 32 220)">EGE DENİZİ</text>
+       <path class="atlasCountry" d="M 68.4 86.3 L 115.7 71.7 L 155.7 77.9 L 161.2 95.8 L 201.7 110.7 L 193.2 122.1 L 138.1 124.7 L 118.3 139.0 L 79.6 164.0 L 65.0 142.4 L 65.6 132.8 L 76.7 127.6 L 91.0 98.6 L 68.4 86.3 Z"></path>
+       <path class="atlasCountry" d="M 70.9 196.0 L 122.4 151.6 L 193.9 149.7 L 213.4 114.4 L 301.8 120.6 L 357.6 90.5 L 411.7 77.4 L 488.5 76.4 L 569.5 109.1 L 636.1 127.0 L 690.1 119.9 L 730.1 124.0 L 784.9 99.8 L 834.3 97.6 L 879.0 120.4 L 886.9 136.7 L 882.5 159.3 L 917.0 170.8 L 935.0 184.2 L 903.5 197.6 L 918.0 250.8 L 908.9 265.2 L 934.3 302.4 L 912.0 310.2 L 895.7 298.4 L 841.7 292.4 L 821.8 299.6 L 769.0 306.9 L 744.0 306.1 L 690.6 323.5 L 652.4 323.6 L 627.7 314.9 L 576.6 327.8 L 561.4 318.8 L 558.9 344.7 L 546.5 354.8 L 534.1 365.0 L 517.0 344.0 L 534.6 326.5 L 506.3 330.5 L 467.4 319.8 L 435.5 346.5 L 365.1 351.7 L 327.5 326.8 L 277.5 325.3 L 266.8 344.5 L 234.7 350.0 L 189.8 325.3 L 139.2 326.1 L 111.7 280.0 L 77.8 254.2 L 100.3 218.1 L 70.9 196.0 Z"></path>
+       <g id="hotspotLayer"></g>
+     </svg>
+   </div>
+   <div class="atlasBottom">
+     <div class="atlasInfo" id="atlasInfo"></div>
+     <div class="atlasQuiz">
+       <h4>🎯 Haritada Sor</h4>
+       <div id="geoQuestion"></div>
+       <div class="muted" style="margin-top:6px">Cevap vermek için haritadaki etikete tıkla.</div>
+       <div id="geoFeedback"></div>
+       <button class="btn" style="margin-top:10px" onclick="newGeoQuiz()">başka soru</button>
+     </div>
+   </div>
  </div>`;
  drawGeo();$("#modal").classList.add("show")
 }

@@ -1,18 +1,17 @@
-EROL KPSS • USTALIK + ATLAS V2
+EROL KPSS • DÜZELTİLMİŞ SÜRÜM
 
-Konu ustalığı:
-- Son 20 cevap kullanılır.
-- 🟥 zayıf: %60 altı
-- 🟨 gelişiyor: %60-79 veya henüz 10 soru yok
-- 🟩 öğrendi: en az 10 soru ve %80+
-- Başarı sonradan düşerse “öğrendi” statüsü ve tamamlandı işareti geri alınır.
-- Firebase ile topicHistory senkronlanır.
+Düzeltmeler:
+- Konu kartlarının kaybolmasına neden olan topicHistory hatası giderildi.
+- Eski localStorage verisi olan cihazlarda da konu kartları görünür.
+- Gerçek konu ustalığı sistemi korunur:
+  🟥 zayıf / 🟨 gelişiyor / 🟩 öğrendi
+  Son 20 soru baz alınır; başarı düşerse statü geri alınır.
+- Coğrafya haritası yeniden yapıldı:
+  gerçek Türkiye ülke sınırı koordinatlarından oluşturulan SVG silüet,
+  bölgeler/madenler/tarım/iklim katmanları,
+  temiz nokta ve etiket sistemi,
+  Haritada Sor modu.
+- Genel arayüz değiştirilmedi.
 
-Coğrafya:
-- Eski renkli blok harita kaldırıldı.
-- Daha sade, atlas tarzı tek renk Türkiye görünümü.
-- Bölgeler / Madenler / Tarım / İklim noktaları.
-- Haritada Sor: soruya göre doğru noktaya tıklama.
-- Sağdaki uzun kart sütunu kaldırıldı.
-
-Genel arayüz korunmuştur.
+GitHub:
+Mevcut index.html dosyasını bununla değiştirip commit et.
