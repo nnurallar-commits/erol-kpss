@@ -1,10 +1,15 @@
-EROL KPSS • GELİŞMİŞ ANALİZ + HARİTA MODU
+EROL KPSS • HARİTA MODU DÜZELTİLDİ
 
-Arayüz korunarak eklenenler:
-- Konu öğrenme kilidi: en az 10 soru + %70 başarı olmadan konu tamamlanmaz.
-- Deneme analizi: ders ve konu bazında başarı yüzdesi, net ve süre.
-- Nisu paneli: bugün soru/doğru/yanlış/süre, en çok zorlanılan konu, son 7 gün grafiği, zor sorular.
-- Coğrafya harita modu: Türkiye bölgeleri görseli + madenler, tarım, iklim hızlı tekrar kartları.
-- Firebase senkronuna topicStats ve examHistory eklendi.
+Sorun:
+Önceki sürüm haritayı assets/turkiye-bolgeler.png dosyasından çağırıyordu.
+GitHub'a yalnız index.html yüklendiği için görsel 404 veriyor ve ekranda alt metin görünüyordu.
 
-GitHub'da mevcut index.html ve assets klasörünü bu pakettekilerle değiştir.
+Düzeltme:
+- Harita doğrudan index.html içine SVG olarak gömüldü.
+- Artık assets klasörüne ihtiyaç yok.
+- GitHub Pages'te tek index.html ile çalışır.
+- Harita modalı daha geniş açılır.
+- Mevcut arayüz korunmuştur.
+
+GitHub:
+Mevcut index.html dosyasını bu paketteki index.html ile değiştir.
