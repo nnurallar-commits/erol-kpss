@@ -139,6 +139,10 @@ if(!Array.isArray(state.hardQuestions))state.hardQuestions=[];
 if(!state.topicStats||typeof state.topicStats!=="object")state.topicStats={};
 if(!state.topicHistory||typeof state.topicHistory!=="object")state.topicHistory={};
 if(!state.difficulty)state.difficulty="Karışık";
+if(!state.progress||typeof state.progress!=="object")state.progress={};
+if(!state.answers||typeof state.answers!=="object")state.answers={};
+if(!Number.isFinite(state.clientUpdatedAt))state.clientUpdatedAt=0;
+
 if(!Array.isArray(state.examHistory))state.examHistory=[];
 if(!state.sessionStartedAt)state.sessionStartedAt=Date.now();
 let selected="Tümü",current=null,refs=[],qi=0,examSession=null;
@@ -148,17 +152,44 @@ function save(){
  const d=dayKey();
  state.daily[d]=state.daily[d]||{solved:0,correct:0,topics:{},minutes:0};
  if(typeof studyMinutesToday==="function")state.daily[d].minutes=studyMinutesToday();
- localStorage.setItem(KEY,JSON.stringify(state));stats();pushCloud()
+ state.clientUpdatedAt=Date.now();
+ localStorage.setItem(KEY,JSON.stringify(state));
+ stats();
+ pushCloud();
 }
-function pushCloud(){if(!db)return;const d=dayKey();db.collection("kpss").doc("erol-kpss-progress").set({done:state.done,solved:state.solved,correct:state.correct,wrong:state.wrong,theme:state.theme,daily:state.daily,studyLog:state.studyLog.slice(-250),hardQuestions:state.hardQuestions.slice(-120),sessionStartedAt:state.sessionStartedAt,topicStats:state.topicStats,topicHistory:state.topicHistory,examHistory:state.examHistory.slice(-20),lastStudyAt:new Date().toISOString(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(()=>{})}
-function listen(){if(!db)return;db.collection("kpss").doc("erol-kpss-progress").onSnapshot(s=>{if(!s.exists)return;const x=s.data();["done","wrong"].forEach(k=>{if(Array.isArray(x[k]))state[k]=x[k]});["solved","correct"].forEach(k=>{if(Number.isFinite(x[k]))state[k]=x[k]});if(x.daily)state.daily=x.daily;
-if(Array.isArray(x.studyLog))state.studyLog=x.studyLog;
-if(Array.isArray(x.hardQuestions))state.hardQuestions=x.hardQuestions;
-if(x.sessionStartedAt)state.sessionStartedAt=x.sessionStartedAt;
-if(x.topicStats)state.topicStats=x.topicStats;
-if(x.topicHistory)state.topicHistory=x.topicHistory; else if(!state.topicHistory)state.topicHistory={};
-if(Array.isArray(x.examHistory))state.examHistory=x.examHistory;
-stats();render()})}
+function pushCloud(){if(!db)return;const d=dayKey();db.collection("kpss").doc("erol-kpss-progress").set({done:state.done,solved:state.solved,correct:state.correct,wrong:state.wrong,theme:state.theme,daily:state.daily,studyLog:state.studyLog.slice(-250),hardQuestions:state.hardQuestions.slice(-120),sessionStartedAt:state.sessionStartedAt,topicStats:state.topicStats,topicHistory:state.topicHistory,examHistory:state.examHistory.slice(-20),progress:state.progress,answers:state.answers,difficulty:state.difficulty,clientUpdatedAt:state.clientUpdatedAt,lastStudyAt:new Date().toISOString(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(()=>{})}
+function listen(){
+ if(!db)return;
+ db.collection("kpss").doc("erol-kpss-progress").onSnapshot(s=>{
+   if(!s.exists){pushCloud();return}
+   const x=s.data()||{};
+   const remoteTs=Number(x.clientUpdatedAt||0);
+   const localTs=Number(state.clientUpdatedAt||0);
+
+   // Eski/stale bulut verisi yereldeki yeni ilerlemeyi sıfırlamasın.
+   if(remoteTs>localTs){
+     ["done","wrong"].forEach(k=>{if(Array.isArray(x[k]))state[k]=x[k]});
+     ["solved","correct"].forEach(k=>{if(Number.isFinite(x[k]))state[k]=x[k]});
+     if(x.daily)state.daily=x.daily;
+     if(Array.isArray(x.studyLog))state.studyLog=x.studyLog;
+     if(Array.isArray(x.hardQuestions))state.hardQuestions=x.hardQuestions;
+     if(x.sessionStartedAt)state.sessionStartedAt=x.sessionStartedAt;
+     if(x.topicStats)state.topicStats=x.topicStats;
+     if(x.topicHistory)state.topicHistory=x.topicHistory;
+     if(Array.isArray(x.examHistory))state.examHistory=x.examHistory;
+     if(x.progress)state.progress=x.progress;
+     if(x.answers)state.answers=x.answers;
+     if(x.difficulty)state.difficulty=x.difficulty;
+     state.clientUpdatedAt=remoteTs;
+     localStorage.setItem(KEY,JSON.stringify(state));
+     stats();render();
+   }else if(localTs>remoteTs){
+     pushCloud();
+   }else{
+     stats();render();
+   }
+ });
+}
 function stats(){$("#doneN").textContent=state.done.length;$("#solvedN").textContent=state.solved;$("#acc").textContent=state.solved?`%${Math.round(state.correct/state.solved*100)}`:"%0";const d=state.daily[dayKey()]||{solved:0};$("#todayN").textContent=(d.solved||0)+" soru";$("#bar").style.width=Math.round(state.done.length/DATA.length*100)+"%"}
 function countdown(){const exam=new Date("2026-10-04T10:15:00+03:00");$("#days").textContent=Math.max(0,Math.ceil((exam-new Date())/86400000))}
 function subs(){const a=["Tümü",...Object.keys(EXAM)];$("#subs").innerHTML=a.map(s=>`<button class="sub ${s===selected?"active":""}" data-s="${s}"><span>${s}</span><b>${s==="Tümü"?DATA.length:DATA.filter(x=>x.subject===s).length}</b></button>`).join("");document.querySelectorAll(".sub").forEach(b=>b.onclick=()=>{selected=b.dataset.s;subs();render()})}
@@ -224,47 +255,208 @@ window.toggle=id=>{
  }
  state.done.push(id);save();render();
 }
-function makeQuestions(t,count=60){
-  if(t.subject!=="Matematik"){
-    const out=[];for(let i=0;i<count;i++){const tip=t.tips[i%t.tips.length],lv=i<count/3?"Kolay":i<2*count/3?"Orta":"KPSS ayarı";let o=[tip,"Soruyu okumadan tahmin etmek","Konu bilgisini görmezden gelmek","Her seçeneği doğru kabul etmek"];const shift=(i+t.id)%4,c=o[0];o=o.slice(shift).concat(o.slice(0,shift));out.push({q:`${t.topic} konusunda bu soruyu çözerken hangi yaklaşım daha doğrudur?`,o,a:o.indexOf(c),e:tip,level:lv})}return out
-  }
-  const out=[];
-  const gcd=(a,b)=>b?gcd(b,a%b):Math.abs(a), lcm=(a,b)=>Math.abs(a*b)/gcd(a,b);
-  const add=(q,ans,d,e,lv)=>{let vals=[ans,...d].map(String);vals=[...new Set(vals)];let k=1;while(vals.length<4){vals.push(String(Number(ans)+k++))}vals=vals.slice(0,4);const shift=(out.length*3+t.id)%4;const o=vals.slice(shift).concat(vals.slice(0,shift));out.push({q,o,a:o.indexOf(String(ans)),e,level:lv||((out.length<count/3)?"Kolay":out.length<2*count/3?"Orta":"KPSS ayarı")})};
-  for(let i=0;i<count;i++){
-    const n=i+1, A=6+(n*7)%31, B=3+(n*5)%19, C=2+(n*3)%11;
-    switch(t.topic){
-      case "Temel Kavramlar": {let x=5+n%20,k=2+n%4,c=1+(n*3)%9,r=k*x+c;add(`Bir sayının ${k} katının ${c} fazlası ${r} olduğuna göre sayı kaçtır?`,x,[x+2,x-2,x+4],`${k}x+${c}=${r}. Buradan ${k}x=${r-c} ve x=${x}.`);break}
-      case "Sayılar": {let x=10+n%30;add(`${x-2}, ${x}, ${x+2} ardışık çift sayılarının toplamı kaçtır?`,3*x,[3*x-2,3*x+2,2*x],`Toplam (${x-2})+${x}+(${x+2})=${3*x}.`);break}
-      case "Bölme-Bölünebilme Kuralları": {let x=100+9*n,r=x%9;add(`${x} sayısının 9 ile bölümünden kalan kaçtır?`,r,[(r+1)%9,(r+2)%9,(r+3)%9],`9'a bölümde kalan, rakamlar toplamının 9'a bölümünden kalanla aynıdır. Sonuç ${r}.`);break}
-      case "Asal Çarpanlara Ayırma": {let p=[2,3,5,7][n%4],q=[3,5,7,11][(n+1)%4],x=p*p*q;add(`${x} sayısının asal çarpanlarının toplamı kaçtır?`,p+q,[p*q,p+q+2,p+q-1],`${x}=${p}²·${q}. Farklı asal çarpanlar ${p} ve ${q}; toplam ${p+q}.`);break}
-      case "EBOB-EKOK": {let a=12+2*(n%12),b=18+3*(n%10),g=gcd(a,b);add(`${a} ve ${b} sayılarının EBOB'u kaçtır?`,g,[g*2,Math.max(1,g/2),lcm(a,b)],`Ortak asal çarpanların küçük üsleri alınır. EBOB=${g}.`);break}
-      case "Birinci Dereceden Denklemler": {let x=4+n%25,k=2+n%5,c=2+n%8,r=k*x-c;add(`${k}x-${c}=${r} denkleminde x kaçtır?`,x,[x+1,x-1,x+3],`${k}x=${r+c}; x=${x}.`);break}
-      case "Rasyonel Sayılar": {let a=1+n%5,b=2+(n%4),c=1+(n*2)%5,d=3+(n%5),num=a*d+c*b,den=b*d,g=gcd(num,den),ans=`${num/g}/${den/g}`;add(`${a}/${b} + ${c}/${d} işleminin sonucu kaçtır?`,ans,[`${a+c}/${b+d}`,`${num}/${den+1}`,`${num+1}/${den}`],`Ortak payda ${den}. Toplam ${num}/${den} ve sadeleşmiş hâli ${ans}.`);break}
-      case "Eşitsizlikler": {let x=3+n%20,k=2+n%4,c=1+n%7,r=k*x+c;add(`${k}x+${c}<${r} eşitsizliğini sağlayan en büyük tam sayı x kaçtır?`,x-1,[x,x-2,x+1],`${k}x<${r-c} → x<${x}. En büyük tam sayı ${x-1}.`);break}
-      case "Mutlak Değer": {let a=2+n%15,b=1+n%7;add(`|x-${a}|=${b} denkleminin çözümlerinin toplamı kaçtır?`,2*a,[2*b,a+b,a-b],`Çözümler ${a-b} ve ${a+b}; toplam ${2*a}.`);break}
-      case "Üslü Sayılar": {let a=2+n%4,b=2+n%5,c=1+n%3,exp=a+b-c,ans=2**exp;add(`2^${a} · 2^${b} / 2^${c} işleminin sonucu kaçtır?`,ans,[2**(exp-1),2**(exp+1),exp],`Üsler ${a}+${b}-${c}=${exp}; sonuç 2^${exp}=${ans}.`);break}
-      case "Çarpanlara Ayırma": {let a=2+n%9,b=3+(n*2)%9;add(`x²+${a+b}x+${a*b} ifadesinin çarpanlarından biri hangisidir?`,`x+${a}`,[`x-${a}`,`x+${a+b}`,`x-${b}`],`Toplamı ${a+b}, çarpımı ${a*b} olan sayılar ${a} ve ${b}. İfade (x+${a})(x+${b}).`);break}
-      case "Köklü Sayılar": {let k=2+n%8,m=[2,3,5,6,7][n%5],inside=k*k*m;add(`√${inside} ifadesinin sade hâli hangisidir?`,`${k}√${m}`,[`${m}√${k}`,`${k+1}√${m}`,`${k}√${m+1}`],`${inside}=${k*k}·${m}; √${inside}=${k}√${m}.`);break}
-      case "Oran-Orantı": {let a=2+n%5,b=3+(n*2)%6,k=3+n%8,total=(a+b)*k,ans=a*k;add(`A:B=${a}:${b} ve A+B=${total} ise A kaçtır?`,ans,[b*k,k,total-ans],`Toplam ${a+b} pay ${total}; 1 pay ${k}. A=${a}·${k}=${ans}.`);break}
-      case "Problemler": {let type=n%5;if(type===0){let p=10+5*(n%7),price=200+20*(n%10),ans=price*(100-p)/100;add(`${price} TL'lik ürüne %${p} indirim uygulanırsa satış fiyatı kaç TL olur?`,ans,[price- p,price*(100+p)/100,ans+20],`İndirim ${price*p/100} TL; yeni fiyat ${ans} TL.`)}else if(type===1){let v=40+10*(n%6),h=2+n%4,ans=v*h;add(`Saatte ${v} km giden araç ${h} saatte kaç km yol alır?`,ans,[v+h,ans-v,ans+v],`Yol=hız×zaman=${v}×${h}=${ans} km.`)}else if(type===2){let age=18+n%20,d=4+n%8;add(`Ayşe ${age}, kardeşi ondan ${d} yaş küçüktür. Yaşları toplamı kaçtır?`,2*age-d,[2*age+d,age-d,age+d],`Kardeş ${age-d}; toplam ${age}+${age-d}=${2*age-d}.`)}else if(type===3){let cost=100+10*(n%15),p=10+5*(n%6),ans=cost*(100+p)/100;add(`${cost} TL maliyetli ürün %${p} kârla satılırsa satış fiyatı kaç TL olur?`,ans,[cost+p,cost*(100-p)/100,ans+10],`Kâr ${cost*p/100}; satış ${ans} TL.`)}else{let total=40+5*(n%10),done=10+2*(n%10),ans=total-done;add(`${total} sayfalık işin ${done} sayfası tamamlandı. Kaç sayfa kalır?`,ans,[total+done,done,total],`${total}-${done}=${ans}.`)}break}
-      case "Kümeler": {let a=12+n%10,b=10+(n*2)%10,inter=3+n%5,ans=a+b-inter;add(`s(A)=${a}, s(B)=${b}, s(A∩B)=${inter} ise s(A∪B) kaçtır?`,ans,[a+b,ans-1,inter],`Birleşim=${a}+${b}-${inter}=${ans}.`);break}
-      case "Fonksiyon": {let m=2+n%5,c=1+n%7,x=1+n%6,ans=m*x+c;add(`f(x)=${m}x+${c} ise f(${x}) kaçtır?`,ans,[m+x+c,m*x-c,ans+1],`x=${x} yazılır: ${m}·${x}+${c}=${ans}.`);break}
-      case "Permütasyon-Kombinasyon-Olasılık": {let balls=4+n%5,red=1+n%(balls-1);add(`Bir torbada ${red} kırmızı ve ${balls-red} mavi top vardır. Rastgele seçilen bir topun kırmızı olma olasılığı kaçtır?`,`${red}/${balls}`,[`${balls-red}/${balls}`,`${red}/${balls+1}`,`1/${balls}`],`Uygun durum ${red}, tüm durum ${balls}; olasılık ${red}/${balls}.`);break}
-      case "Modüler Aritmetik": {let m=3+n%7,x=20+7*n,r=x%m;add(`${x} sayısının ${m} ile bölümünden kalan kaçtır?`,r,[(r+1)%m,(r+2)%m,(r+m-1)%m],`${x}=${Math.floor(x/m)}·${m}+${r}. Kalan ${r}.`);break}
-      case "Tablo ve Grafikler": {let a=20+n%15,b=25+(n*2)%20,c=15+(n*3)%18,ans=Math.max(a,b,c);let name=ans===a?'A':ans===b?'B':'C';add(`Bir tabloda A=${a}, B=${b}, C=${c} verilmiştir. En yüksek değere sahip grup hangisidir?`,name,['A','B','C','D'].filter(x=>x!==name).slice(0,3),`Değerler karşılaştırılır; en büyük ${ans} ile ${name} grubudur.`);break}
-      case "Sayısal Mantık": {let d=2+n%6,s=1+n%9,ans=s+5*d;add(`${s}, ${s+d}, ${s+2*d}, ${s+3*d}, ${s+4*d}, ? dizisinde sonraki sayı kaçtır?`,ans,[ans-d,ans+d,ans+2],`Her adımda ${d} ekleniyor. Sonraki sayı ${ans}.`);break}
-      case "Geometri: Açılar-Üçgenler": {let a=30+n%40,b=40+(n*2)%50;if(a+b>=170)b=60;let ans=180-a-b;add(`Bir üçgenin iki iç açısı ${a}° ve ${b}° ise üçüncü açı kaç derecedir?`,ans,[180-a,180-b,ans+10],`Üçgenin iç açıları toplamı 180°. 180-${a}-${b}=${ans}°.`);break}
-      case "Geometri: Dörtgen-Çokgen": {let nside=4+n%7,ans=(nside-2)*180;add(`${nside} kenarlı bir çokgenin iç açılar toplamı kaç derecedir?`,ans,[nside*180,(nside-1)*180,ans-180],`Formül (n-2)·180. (${nside}-2)·180=${ans}°.`);break}
-      case "Geometri: Çember-Daire": {let r=2+n%12,ans=2*r;add(`Yarıçapı ${r} cm olan çemberin çapı kaç cm'dir?`,ans,[r,r*r,ans+2],`Çap=2r=2·${r}=${ans} cm.`);break}
-      default:add(`${A}+${B} işleminin sonucu kaçtır?`,A+B,[A+B+1,A+B-1,A+B+2],`${A}+${B}=${A+B}.`)
-    }
-  }
-  return out;
-}
 
+function makeQuestions(t,count=60){
+ const out=[];
+ const gcd=(a,b)=>b?gcd(b,a%b):Math.abs(a);
+ const lcm=(a,b)=>Math.abs(a*b)/gcd(a,b);
+ const uniq4=(ans,arr)=>{
+   const vals=[String(ans),...arr.map(String)];
+   const u=[];
+   for(const v of vals)if(!u.includes(v))u.push(v);
+   let k=1;
+   while(u.length<4){const v=String(Number(ans)+k++);if(!u.includes(v))u.push(v)}
+   return u.slice(0,4);
+ };
+ const add=(q,ans,d,e,level,seed)=>{
+   let vals=uniq4(ans,d);
+   const correct=String(ans),shift=(seed+t.id)%4;
+   vals=vals.slice(shift).concat(vals.slice(0,shift));
+   out.push({q,o:vals,a:vals.indexOf(correct),e,level});
+ };
+ const per=Math.ceil(count/3);
+
+ if(t.subject!=="Matematik"){
+   // Zor havuzu ASLA boş kalmasın. Üç seviye ayrı ayrı üretilir.
+   ["Kolay","Orta","Zor"].forEach((lv,li)=>{
+     for(let j=0;j<per;j++){
+       const tip=t.tips[j%t.tips.length];
+       if(lv==="Kolay"){
+         add(`${t.topic} konusunda aşağıdakilerden hangisi temel olarak doğrudur?`,tip,
+           ["Bu bilgi konuyla ilgisizdir.","Bu konuda hiçbir temel kural yoktur.","Sorudaki bağlam her zaman önemsizdir"],
+           tip,lv,j+li*100);
+       }else if(lv==="Orta"){
+         add(`${t.topic} sorusunda doğru sonuca ulaşmak için hangi bilgi/ilişki esas alınmalıdır?`,t.summary,
+           [tip,"Şıkların uzunluğu","Soru numarası"],
+           `${t.summary} ${tip}`,lv,j+li*100);
+       }else{
+         add(`${t.topic} ile ilgili yorum gerektiren bir soruda hangi yaklaşım daha sağlamdır?`,
+           `${tip} Bağlamla birlikte değerlendirilmelidir.`,
+           ["Tek bir kelimeye bakmak yeterlidir.","Kronoloji/bağlam hiçbir zaman önemli değildir.","Şıkların biçimine göre karar verilmelidir."],
+           `Zor soruda bilgi + bağlam birlikte kullanılır. ${tip}`,lv,j+li*100);
+       }
+     }
+   });
+   return out.slice(0,count);
+ }
+
+ function gen(topic,lv,j){
+   const n=j+1, A=7+(n*7+t.id)%29, B=3+(n*5+t.id)%13, C=2+(n*3+t.id)%9;
+   switch(topic){
+     case "Temel Kavramlar":
+       if(lv==="Kolay"){let x=8+n%17;add(`Bir sayının 4 katı ${4*x} ise sayı kaçtır?`,x,[x+2,x-2,4*x],`4x=${4*x} → x=${x}.`,lv,n)}
+       else if(lv==="Orta"){let x=12+n%18;add(`Ardışık üç tam sayının toplamı ${3*x} ise en büyük sayı kaçtır?`,x+1,[x,x-1,x+2],`Sayılar ${x-1}, ${x}, ${x+1}. En büyük ${x+1}.`,lv,n)}
+       else{let tens=2+n%6,ones=(3*n)%10;let number=10*tens+ones;let ans=number-(10*ones+tens);add(`İki basamaklı ${number} sayısının rakamları yer değiştirildiğinde oluşan sayı ile farkı kaçtır?`,ans,[Math.abs(ans),9*(tens+ones),number],`${number}-(10·${ones}+${tens})=${ans}.`,lv,n)}
+       break;
+
+     case "Sayılar":
+       if(lv==="Kolay"){let x=10+2*(n%20);add(`${x-2}, ${x}, ${x+2} ardışık çift sayılarının toplamı kaçtır?`,3*x,[2*x,3*x+2,3*x-2],`Toplam ${3*x}.`,lv,n)}
+       else if(lv==="Orta"){let a=2+n%7,b=1+(2*n)%9;let num=100*a+10*b+5;add(`${num} sayısında yüzler basamağındaki rakamın basamak değeri kaçtır?`,100*a,[a,10*b,100*a+10*b],`Yüzler basamağı ${a}; basamak değeri ${100*a}.`,lv,n)}
+       else{let x=20+n%30;let y=x+1,z=x+2;add(`Ardışık üç pozitif tam sayının çarpımı ${x*y*z} olduğuna göre ortanca sayı kaçtır?`,y,[x,z,x+3],`${x}·${y}·${z} verilmiştir; ortanca ${y}.`,lv,n)}
+       break;
+
+     case "Bölme-Bölünebilme Kuralları":
+       if(lv==="Kolay"){let x=100+7*n,r=x%5;add(`${x} sayısının 5 ile bölümünden kalan kaçtır?`,r,[(r+1)%5,(r+2)%5,5-r],`Son basamağa bakılır. Kalan ${r}.`,lv,n)}
+       else if(lv==="Orta"){let a=(3*n)%10;while((4+a+2)%3!==0)a=(a+1)%10;add(`4a2 sayısı 3 ile tam bölünebildiğine göre a aşağıdakilerden hangisi olabilir?`,a,[(a+1)%10,(a+2)%10,(a+4)%10],`4+a+2=6+a, 3'ün katı olmalı.`,lv,n)}
+       else{let a=(n%8)+1;while((7+a+5)%9!==0)a=(a+1)%10;add(`7a5 sayısı hem 5'e hem 9'a tam bölünüyor. a kaçtır?`,a,[(a+1)%10,(a+2)%10,(a+3)%10],`5'e bölünme zaten sağlanır. 7+a+5=12+a, 9'un katı olmalı.`,lv,n)}
+       break;
+
+     case "Asal Çarpanlara Ayırma":
+       if(lv==="Kolay"){let p=[2,3,5,7][n%4],q=[3,5,7,11][(n+1)%4];let x=p*p*q;add(`${x} sayısının farklı asal çarpanları toplamı kaçtır?`,p+q,[p*q,p+q+1,p+q+2],`${x}=${p}²·${q}.`,lv,n)}
+       else if(lv==="Orta"){let a=1+n%3,b=1+(n%2);let x=(2**a)*(3**b);let ans=(a+1)*(b+1);add(`${x} sayısının pozitif bölen sayısı kaçtır?`,ans,[ans-1,ans+1,a+b+1],`2^${a}·3^${b} → bölen sayısı (${a}+1)(${b}+1)=${ans}.`,lv,n)}
+       else{let m=20+5*n;let z=0,k=m;while(k>=5){k=Math.floor(k/5);z+=k}add(`${m}! sayısının sonunda kaç sıfır vardır?`,z,[z-1,z+1,Math.floor(m/5)],`5 çarpanları sayılır: sonuç ${z}.`,lv,n)}
+       break;
+
+     case "EBOB-EKOK":
+       if(lv==="Kolay"){let a=24+6*(n%5),b=18+6*(n%6),g=gcd(a,b);add(`${a} ve ${b} sayılarının EBOB'u kaçtır?`,g,[g*2,lcm(a,b),Math.max(1,g-1)],`EBOB=${g}.`,lv,n)}
+       else if(lv==="Orta"){let a=8+2*(n%5),b=12+3*(n%5),L=lcm(a,b);add(`${a} dakikada ve ${b} dakikada bir çalışan iki sistem birlikte başladı. Kaç dakika sonra yeniden birlikte çalışırlar?`,L,[gcd(a,b),L+a,L-b],`Birlikte tekrar zamanı EKOK'tur: ${L}.`,lv,n)}
+       else{let g=3+(n%4),L=g*(12+2*(n%5)),a=g*(2+(n%3));let b=g*L/a;if(Number.isInteger(b)){add(`İki pozitif sayının EBOB'u ${g}, EKOK'u ${L}. Sayılardan biri ${a} ise diğeri kaçtır?`,b,[L/a,g*L,a+g],`a·b=EBOB·EKOK → b=${g}·${L}/${a}=${b}.`,lv,n)}else gen(topic,lv,j+1)}
+       break;
+
+     case "Birinci Dereceden Denklemler":
+       if(lv==="Kolay"){let x=4+n%20,k=2+n%5,c=1+n%8,r=k*x+c;add(`${k}x+${c}=${r} ise x kaçtır?`,x,[x+1,x-1,x+2],`${k}x=${r-c}; x=${x}.`,lv,n)}
+       else if(lv==="Orta"){let x=5+n%15;let r=3*(x-2)+4;add(`3(x-2)+4=${r} denkleminde x kaçtır?`,x,[x+2,x-2,2*x],`3x-6+4=${r} → 3x=${r+2} → x=${x}.`,lv,n)}
+       else{let x=6+n%12;let r=(2*x+3)/3;if(!Number.isInteger(r)){gen(topic,lv,j+1);break}add(`(2x+3)/3=${r} ise x kaçtır?`,x,[x+3,x-3,2*x],`2x+3=${3*r} → 2x=${3*r-3} → x=${x}.`,lv,n)}
+       break;
+
+     case "Rasyonel Sayılar":
+       if(lv==="Kolay"){let a=1+n%4,b=2+(n%4),c=1+(2*n)%4,d=3+(n%5);let num=a*d+c*b,den=b*d,g=gcd(num,den);add(`${a}/${b}+${c}/${d}=?`,`${num/g}/${den/g}`,[`${a+c}/${b+d}`,`${num}/${den}`,`${num+1}/${den}`],`Ortak payda ${den}; sonuç ${num/g}/${den/g}.`,lv,n)}
+       else if(lv==="Orta"){let a=2+n%5,b=3+n%4,c=1+n%3,d=2+n%5;let num=a*d,den=b*c,g=gcd(num,den);add(`(${a}/${b}) ÷ (${c}/${d}) işleminin sonucu kaçtır?`,`${num/g}/${den/g}`,[`${a*c}/${b*d}`,`${a+d}/${b+c}`,`${num}/${den+1}`],`İkinci kesir ters çevrilir: ${a}/${b}·${d}/${c}.`,lv,n)}
+       else{let x=2+n%6;let rhs=x+1;add(`x/3 + 2/3 = ${rhs}/3 ise x kaçtır?`,x,[x+1,x-1,3*x],`Paydalar eşit: x+2=${rhs} → x=${x}.`,lv,n)}
+       break;
+
+     case "Eşitsizlikler":
+       if(lv==="Kolay"){let x=5+n%15,k=2+n%4,c=1+n%7,r=k*x+c;add(`${k}x+${c}<${r} eşitsizliğini sağlayan en büyük tam sayı x kaçtır?`,x-1,[x,x-2,x+1],`x<${x}; en büyük tam sayı ${x-1}.`,lv,n)}
+       else if(lv==="Orta"){let a=2+n%5,b=a+6+(n%5);let ans=b-a-1;add(`${a}<x<${b} eşitsizliğini sağlayan kaç tam sayı vardır?`,ans,[ans+1,ans-1,b-a],`${a+1} ile ${b-1} arasında ${ans} tam sayı vardır.`,lv,n)}
+       else{let x=2+n%10;let r=12-3*x;add(`-3x+12>${r} eşitsizliğini çözerken -3'e bölündüğünde işaret yön değiştirir. Buna göre x için doğru sınır hangisidir?`,`${x>0?">":"<"} ${x}`,[`< ${x}`,`≥ ${x}`,`≤ ${x}`],`Negatif sayıya bölmede yön değişir.`,lv,n)}
+       break;
+
+     case "Mutlak Değer":
+       if(lv==="Kolay"){let a=2+n%12,b=1+n%5;add(`|x-${a}|=${b} denkleminin çözümleri toplamı kaçtır?`,2*a,[2*b,a+b,a-b],`Çözümler ${a-b} ve ${a+b}; toplam ${2*a}.`,lv,n)}
+       else if(lv==="Orta"){let x=3+n%8;let a=2*x+1;add(`|2x-1|=${a-1} denkleminde pozitif çözüm kaçtır?`,x,[x+1,x-1,2*x],`2x-1=${2*x-1} → x=${x}.`,lv,n)}
+       else{let a=3+n%6;add(`|x-${a}|<2 eşitsizliğini sağlayan tam sayıların toplamı kaçtır?`,3*a,[a,2*a,4*a],`${a-2}<x<${a+2}; tam sayılar ${a-1},${a},${a+1}; toplam ${3*a}.`,lv,n)}
+       break;
+
+     case "Üslü Sayılar":
+       if(lv==="Kolay"){let a=2+n%4,b=2+n%4,exp=a+b;add(`2^${a}·2^${b} işleminin sonucu kaçtır?`,2**exp,[2**(exp-1),2**(exp+1),exp],`Üsler toplanır: 2^${exp}.`,lv,n)}
+       else if(lv==="Orta"){let a=2+n%3,b=2+n%3;let exp=a*b;add(`(2^${a})^${b} kaçtır?`,2**exp,[2**(a+b),2**(exp-1),exp],`Üsler çarpılır: 2^${exp}.`,lv,n)}
+       else{let x=3+n%5;add(`2^(x+1)=${2**(x+1)} olduğuna göre x kaçtır?`,x,[x+1,x-1,2*x],`${2**(x+1)}=2^${x+1}; üsler eşitlenir.`,lv,n)}
+       break;
+
+     case "Çarpanlara Ayırma":
+       if(lv==="Kolay"){let a=2+n%6,b=3+(2*n)%7;add(`x²+${a+b}x+${a*b} ifadesinin bir çarpanı hangisidir?`,`x+${a}`,[`x-${a}`,`x+${a+b}`,`x-${b}`],`(x+${a})(x+${b}).`,lv,n)}
+       else if(lv==="Orta"){let a=3+n%8;add(`x²-${a*a} ifadesinin çarpanlara ayrılmış hâli hangisidir?`,`(x-${a})(x+${a})`,[`(x-${a})²`,`(x+${a})²`,`x(x-${a})`],`İki kare farkı: x²-${a}²=(x-${a})(x+${a}).`,lv,n)}
+       else{let a=2+n%6;add(`x²+${2*a}x+${a*a} ifadesi aşağıdakilerden hangisine eşittir?`,`(x+${a})²`,[`(x-${a})²`,`x²+${a}²`,`(x+${2*a})²`],`Tam kare özdeşliği.`,lv,n)}
+       break;
+
+     case "Köklü Sayılar":
+       if(lv==="Kolay"){let k=2+n%7,m=[2,3,5,6,7][n%5],inside=k*k*m;add(`√${inside} ifadesinin sade hâli hangisidir?`,`${k}√${m}`,[`${m}√${k}`,`${k+1}√${m}`,`${k}√${m+1}`],`√${inside}=${k}√${m}.`,lv,n)}
+       else if(lv==="Orta"){let m=[2,3,5][n%3];let a=2+n%4,b=1+n%4;add(`${a}√${m}+${b}√${m} işlemi kaçtır?`,`${a+b}√${m}`,[`${a*b}√${m}`,`${a+b}√${m*2}`,`${a-b}√${m}`],`Benzer köklü terimler: (${a}+${b})√${m}.`,lv,n)}
+       else{let m=[2,3,5][n%3];add(`1/√${m} ifadesinin paydası rasyonelleştirilirse hangisi elde edilir?`,`√${m}/${m}`,[`${m}/√${m}`,`1/${m}`,`√${m}`],`√${m}/√${m} ile çarpılır.`,lv,n)}
+       break;
+
+     case "Oran-Orantı":
+       if(lv==="Kolay"){let a=2+n%4,b=3+(n%5),k=4+n%6,total=(a+b)*k;add(`A:B=${a}:${b}, A+B=${total}. A kaçtır?`,a*k,[b*k,k,total-a*k],`1 pay ${k}; A=${a*k}.`,lv,n)}
+       else if(lv==="Orta"){let workers=4+n%5,days=6+n%6,neww=workers*2;add(`${workers} işçi bir işi ${days} günde bitiriyor. Aynı hızla ${neww} işçi kaç günde bitirir?`,days/2,[days,neww,days*2],`İşçi-süre ters orantılıdır.`,lv,n)}
+       else{let a=2+n%3,b=3+n%4,c=4+n%5;let total=(a+b+c)*5;add(`A:B:C=${a}:${b}:${c} ve toplam ${total} ise B kaçtır?`,b*5,[a*5,c*5,total-b*5],`Toplam ${a+b+c} pay; 1 pay 5.`,lv,n)}
+       break;
+
+     case "Problemler":
+       if(lv==="Kolay"){let type=n%3;if(type===0){let p=10+5*(n%5),price=200+20*n,ans=price*(100-p)/100;add(`${price} TL'lik ürüne %${p} indirim uygulanırsa fiyat kaç TL olur?`,ans,[price,ans+20,ans-20],`Yeni fiyat ${price}·${100-p}/100=${ans}.`,lv,n)}else if(type===1){let v=40+10*(n%5),h=2+n%3;add(`${v} km/sa hızla ${h} saat gidilen yol kaç km'dir?`,v*h,[v+h,v*(h+1),v*h-v],`Yol=hız×zaman.`,lv,n)}else{let age=18+n%15,d=4+n%6;add(`Ali ${age}, kardeşi ${d} yaş küçük. Yaşları toplamı kaçtır?`,2*age-d,[age-d,age+d,2*age+d],`Kardeş ${age-d}; toplam ${2*age-d}.`,lv,n)}}
+       else if(lv==="Orta"){let type=n%3;if(type===0){let cost=200+20*n,p=20;let sale=cost*1.2;let disc=10;let final=sale*.9;add(`${cost} TL maliyetli ürün önce %20 kârla etiketlenip sonra etiket üzerinden %10 indirimle satılıyor. Satış fiyatı kaç TL'dir?`,final,[sale,cost*.9,cost*1.1],`Etiket ${sale}; %10 indirimle ${final}.`,lv,n)}else if(type===1){let v1=60,v2=40,t=3+n%3;add(`Aralarında ${ (v1+v2)*t } km olan iki araç birbirine doğru ${v1} ve ${v2} km/sa hızlarla çıkıyor. Kaç saatte karşılaşırlar?`,t,[t+1,t-1,(v1+v2)*t/v1],`Bağıl hız ${v1+v2}; süre yol/bağıl hız=${t}.`,lv,n)}else{let total=100+10*n,p=30,used=20;let rem=total*(1-p/100)-used;add(`${total} TL'nin %${p}'u harcanıyor, sonra ${used} TL daha harcanıyor. Kaç TL kalır?`,rem,[total-rem,rem+used,total*(1-p/100)],`İlk kalan ${total*(1-p/100)}, sonra ${used} çıkarılır.`,lv,n)}}
+       else{let type=n%3;if(type===0){let a=12,b=18;let rate=1/a+1/b;let time=1/rate;add(`Bir işçi işi ${a} günde, diğeri ${b} günde bitiriyor. Birlikte kaç günde bitirirler?`,time,[a+b,6,9],`Hızlar toplanır: 1/${a}+1/${b}=${rate}; süre ${time}.`,lv,n)}else if(type===1){let concentration=30,lit=20,pure=lit*concentration/100,addw=10,newp=pure/(lit+addw)*100;add(`%${concentration}'luk ${lit} L tuzlu suya ${addw} L saf su ekleniyor. Yeni derişim yüzde kaçtır?`,newp,[concentration,20,15],`Tuz miktarı ${pure} L sabit, toplam ${lit+addw} L; oran %${newp}.`,lv,n)}else{let v1=60,v2=90,d=180;let t=d/(v2-v1);add(`Aynı yönde giden iki araçtan arkadaki ${v2}, öndeki ${v1} km/sa hızla gidiyor. Aralarında ${d} km varsa arkadaki kaç saatte yetişir?`,t,[d/(v1+v2),2,9],`Bağıl hız ${v2-v1}; süre ${d}/${v2-v1}=${t}.`,lv,n)}}
+       break;
+
+     case "Kümeler":
+       if(lv==="Kolay"){let a=12+n%8,b=10+n%7,inter=3+n%4;add(`s(A)=${a}, s(B)=${b}, s(A∩B)=${inter}. s(A∪B)=?`,a+b-inter,[a+b,inter,a+b+inter],`Birleşim=${a}+${b}-${inter}.`,lv,n)}
+       else if(lv==="Orta"){let total=30+n%10,a=18,b=15,inter=a+b-total;add(`Bir grupta ${a} kişi A'yı, ${b} kişi B'yi, toplam ${total} kişi en az birini seçiyor. İkisini de seçen kaç kişidir?`,inter,[a+b,total-a,total-b],`A∪B=A+B-A∩B.`,lv,n)}
+       else{let total=40,a=22,b=20,neither=5,inter=a+b-(total-neither);add(`${total} kişilik grupta ${a} kişi A, ${b} kişi B, ${neither} kişi hiçbirini seçmiyor. Her ikisini seçen kaç kişidir?`,inter,[a+b-total,total-a-b,neither],`En az biri ${total-neither}; kesişim ${a}+${b}-${total-neither}.`,lv,n)}
+       break;
+
+     case "Fonksiyon":
+       if(lv==="Kolay"){let m=2+n%4,c=1+n%5,x=2+n%5;add(`f(x)=${m}x+${c}. f(${x})=?`,m*x+c,[m+x+c,m*x-c,m*x+c+1],`Yerine koy: ${m*x+c}.`,lv,n)}
+       else if(lv==="Orta"){let a=2+n%3,b=1+n%4;let x=2+n%4;let fx=a*x+b;let gx=x+1;add(`f(x)=${a}x+${b}, g(x)=x+1. (f∘g)(${x}) kaçtır?`,a*(x+1)+b,[fx+1,a*x+b,a*(x+2)+b],`Önce g(${x})=${x+1}, sonra f(${x+1}).`,lv,n)}
+       else{let a=2+n%4,b=3+n%5,y=17+n;let num=y-b;if(num%a!==0){gen(topic,lv,j+1);break}add(`f(x)=${a}x+${b} ve f(x)=${y} ise x kaçtır?`,num/a,[num,a*y+b,(y+b)/a],`${a}x+${b}=${y}.`,lv,n)}
+       break;
+
+     case "Permütasyon-Kombinasyon-Olasılık":
+       if(lv==="Kolay"){let red=2+n%4,blue=3+n%4,total=red+blue;add(`Torbadaki ${red} kırmızı, ${blue} mavi toptan biri seçiliyor. Kırmızı gelme olasılığı?`,`${red}/${total}`,[`${blue}/${total}`,`1/${total}`,`${red}/${blue}`],`Uygun/tüm=${red}/${total}.`,lv,n)}
+       else if(lv==="Orta"){let nobj=5+n%4;let ans=nobj*(nobj-1)/2;add(`${nobj} kişiden 2 kişi kaç farklı şekilde seçilir?`,ans,[nobj*2,nobj*(nobj-1),nobj+2],`C(${nobj},2)=${ans}.`,lv,n)}
+       else{let red=3,blue=2,total=5;let ans=red/total*((red-1)/(total-1));add(`3 kırmızı 2 mavi toptan geri koymadan art arda iki top çekiliyor. İkisinin de kırmızı olma olasılığı kaçtır?`,`${red*(red-1)}/${total*(total-1)}`,[`3/5`,`2/5`,`6/25`],`3/5·2/4=6/20.`,lv,n)}
+       break;
+
+     case "Modüler Aritmetik":
+       if(lv==="Kolay"){let m=3+n%6,x=25+7*n;add(`${x} sayısının ${m} ile bölümünden kalan kaçtır?`,x%m,[(x%m+1)%m,(x%m+2)%m,m],`Kalan ${x%m}.`,lv,n)}
+       else if(lv==="Orta"){let m=5,base=2,exp=5+n%5;let ans=(base**exp)%m;add(`2^${exp} sayısının 5 ile bölümünden kalan kaçtır?`,ans,[(ans+1)%5,(ans+2)%5,4],`2'nin 5'e göre kuvvet kalanı döngülüdür.`,lv,n)}
+       else{let m=7,a=3,b=4+n%5;let ans=(a*b+5)%m;add(`${a}·${b}+5 sayısının ${m} ile bölümünden kalan kaçtır?`,ans,[(ans+1)%m,(ans+2)%m,(ans+3)%m],`İşlemi mod ${m} altında yap.`,lv,n)}
+       break;
+
+     case "Tablo ve Grafikler":
+       if(lv==="Kolay"){let a=20+n,b=25+2*n,c=18+3*n;let mx=Math.max(a,b,c),name=mx===a?"A":mx===b?"B":"C";add(`A=${a}, B=${b}, C=${c}. En yüksek değer hangi gruptadır?`,name,["A","B","C"].filter(x=>x!==name).concat("D"),`En büyük ${mx}.`,lv,n)}
+       else if(lv==="Orta"){let old=100+10*n,newv=old*1.2;add(`Bir değer ${old}'dan ${newv}'a çıkıyor. Yüzde artış kaçtır?`,20,[10,25,30],`Artış ${newv-old}; oran %20.`,lv,n)}
+       else{let A=30+n,B=40+n,C=50+n,total=A+B+C;add(`Bir grafikte A=${A}, B=${B}, C=${C}. B'nin toplam içindeki yüzdesi yaklaşık kaçtır?`,Math.round(B/total*100),[Math.round(A/total*100),Math.round(C/total*100),50],`B/toplam×100.`,lv,n)}
+       break;
+
+     case "Sayısal Mantık":
+       if(lv==="Kolay"){let d=2+n%5,s=1+n%7;add(`${s}, ${s+d}, ${s+2*d}, ${s+3*d}, ?`,s+4*d,[s+3*d,s+5*d,s+4*d+1],`Her adım +${d}.`,lv,n)}
+       else if(lv==="Orta"){let s=2+n%5;let seq=[s,s+2,(s+2)*2,(s+2)*2+2,((s+2)*2+2)*2];add(`${seq.slice(0,4).join(", ")}, ? dizisinde kural sırayla +2, ×2 biçimindedir. Sonraki sayı?`,seq[4],[seq[3]+2,seq[3]*2+2,seq[3]*3],`4. terimden sonra ×2 yapılır.`,lv,n)}
+       else{let a=2+n%4;let seq=[a,a+3,(a+3)*2,(a+3)*2+3,((a+3)*2+3)*2];add(`${seq.slice(0,4).join(", ")}, ? dizisinde işlemler +3, ×2 dönüşümlüdür. Sonraki sayı?`,seq[4],[seq[3]+3,seq[3]*2+3,seq[3]+6],`Sıradaki işlem ×2.`,lv,n)}
+       break;
+
+     case "Geometri: Açılar-Üçgenler":
+       if(lv==="Kolay"){let a=40+n%30,b=50+n%30;if(a+b>=170)b=50;add(`Üçgende iki açı ${a}° ve ${b}°. Üçüncü açı?`,180-a-b,[180-a,180-b,90],`İç açılar toplamı 180°.`,lv,n)}
+       else if(lv==="Orta"){let base=40+n%40;let vertex=180-2*base;add(`İkizkenar üçgende taban açıları ${base}° ise tepe açısı kaç derecedir?`,vertex,[base,180-base,2*base],`2·${base}+tepe=180.`,lv,n)}
+       else{let b=6+n%7,h=4+n%6;add(`Tabanı ${b} cm, bu tabana ait yüksekliği ${h} cm olan üçgenin alanı kaç cm²'dir?`,b*h/2,[b*h,b+h,(b*h)/4],`Alan=taban·yükseklik/2.`,lv,n)}
+       break;
+
+     case "Geometri: Dörtgen-Çokgen":
+       if(lv==="Kolay"){let sides=4+n%6;add(`${sides} kenarlı çokgenin iç açılar toplamı kaç derecedir?`,(sides-2)*180,[sides*180,(sides-1)*180,(sides-3)*180],`(n-2)·180.`,lv,n)}
+       else if(lv==="Orta"){let a=5+n%8,b=4+n%7;add(`Kenarları ${a} cm ve ${b} cm olan dikdörtgenin çevresi kaç cm'dir?`,2*(a+b),[a*b,a+b,2*a+b],`Çevre=2(a+b).`,lv,n)}
+       else{let ext=[30,36,40,45,60][n%5];let sides=360/ext;add(`Bir düzgün çokgenin bir dış açısı ${ext}° ise çokgen kaç kenarlıdır?`,sides,[sides+1,sides-1,180/ext],`Dış açı=360/n → n=${sides}.`,lv,n)}
+       break;
+
+     case "Geometri: Çember-Daire":
+       if(lv==="Kolay"){let r=2+n%10;add(`Yarıçapı ${r} cm olan çemberin çapı kaç cm'dir?`,2*r,[r,r*r,2*r+2],`Çap=2r.`,lv,n)}
+       else if(lv==="Orta"){let r=2+n%6;add(`Yarıçapı ${r} cm olan dairenin alanı kaç π cm²'dir?`,r*r,[2*r,r*r*2,r],`Alan=πr². Katsayı ${r*r}.`,lv,n)}
+       else{let r=3+n%5,deg=60;let arc=2*r*deg/360;add(`Yarıçapı ${r} cm olan çemberde ${deg}°'lik yayın uzunluğu kaç π cm'dir?`,arc,[r/2,r,2*r],`Yay=(60/360)·2πr=${arc}π.`,lv,n)}
+       break;
+
+     default:
+       if(lv==="Kolay")add(`${A}+${B}=?`,A+B,[A+B+1,A+B-1,A+B+2],`${A}+${B}=${A+B}.`,lv,n);
+       else if(lv==="Orta")add(`${A}·${B}-${C}=?`,A*B-C,[A*B,A+B-C,A*B+C],`Önce çarpma: ${A*B}-${C}=${A*B-C}.`,lv,n);
+       else add(`(${A}+${B})·${C}-${A}=?`,(A+B)*C-A,[(A+B)*C,(A+B)*(C-A),A+B*C],`Parantez → çarpma → çıkarma.`,lv,n);
+   }
+ }
+
+ ["Kolay","Orta","Zor"].forEach(lv=>{
+   for(let j=0;j<per;j++)gen(t.topic,lv,j);
+ });
+ return out.slice(0,count);
+}
 function difficultyRank(q,i,total){
- if(q&&q.level)return q.level;
+ const raw=q&&q.level;
+ if(raw==="Kolay"||raw==="Orta"||raw==="Zor")return raw;
+ if(raw==="KPSS ayarı")return "Zor";
  const r=i/Math.max(1,total);
  if(r<0.34)return "Kolay";
  if(r<0.67)return "Orta";
@@ -279,65 +471,124 @@ function difficultyBar(){
    ${["Karışık","Kolay","Orta","Zor"].map(x=>`<button class="diffBtn ${state.difficulty===x?"on":""}" onclick="setDifficulty('${x}')">${x}</button>`).join("")}
  </div><div class="diffHint">Erol istediği seviyeyi seçebilir. Karışık mod tüm seviyeleri birlikte getirir.</div>`;
 }
+function progressKey(topicId,diff){return `${topicId}|${diff}`}
+function questionKey(r){return `${r.topicId}|${state.difficulty}|${r.index}`}
 window.setDifficulty=x=>{
- state.difficulty=x;
- localStorage.setItem(KEY,JSON.stringify(state));
- document.querySelectorAll(".diffBtn").forEach(b=>b.classList.toggle("on",b.textContent===x));
  if(current&&current.id){
-   refs=applyDifficulty(makeQuestions(current,current.target).map((q,i)=>({q,topicId:current.id,index:i})));
-   qi=0;
-   drawLesson();
+   state.progress[progressKey(current.id,state.difficulty)]=qi;
  }
+ state.difficulty=x;
+ const all=makeQuestions(current,current.target).map((q,i)=>({q,topicId:current.id,index:i}));
+ refs=applyDifficulty(all);
+ if(!refs.length){
+   // Bu artık normalde gerçekleşmez; yine de kullanıcıyı boş ekranda bırakma.
+   refs=all.filter(r=>difficultyRank(r.q,r.index,all.length)===x);
+ }
+ qi=Math.min(Number(state.progress[progressKey(current.id,x)]||0),Math.max(0,refs.length-1));
+ save();
+ drawLesson();
 }
-
 window.openTopic=id=>{
  current=DATA.find(x=>x.id===id);
  state.studyLog.push({type:"topic",topic:current.topic,subject:current.subject,at:new Date().toISOString()});
- refs=applyDifficulty(makeQuestions(current,current.target).map((q,i)=>({q,topicId:id,index:i})));
- qi=0;save();drawLesson();$("#modal").classList.add("show")
+ const all=makeQuestions(current,current.target).map((q,i)=>({q,topicId:id,index:i}));
+ refs=applyDifficulty(all);
+ if(!refs.length)refs=all; 
+ qi=Math.min(Number(state.progress[progressKey(id,state.difficulty)]||0),Math.max(0,refs.length-1));
+ save();
+ drawLesson();
+ $("#modal").classList.add("show");
 }
 function drawLesson(){$("#body").innerHTML=`<div class="eyebrow">${current.subject} • AĞIRLIK ${current.weight}</div><h2>${current.topic}</h2><p class="muted">${current.summary}</p>${difficultyBar()}<h4>Hızlı notlar</h4><ul>${current.tips.map(x=>`<li>${x}</li>`).join("")}</ul><div id="quiz"></div>`;drawQ()}
-function drawQ(){const h=$("#quiz");if(qi>=refs.length){if(examSession&&examSession.active){finishExam();return}h.innerHTML='<div class="feedback"><b>Bu konu turu bitti.</b></div>';return}const q=refs[qi].q;h.innerHTML=`<div class="q">${qi+1}. ${q.q} <span class="level">${q.level}</span></div><div class="choices">${q.o.map((x,i)=>`<button class="choice" onclick="answer(${i})">${"ABCD"[i]}) ${x}</button>`).join("")}</div><div id="feed"></div>`}
-window.answer=i=>{
- const r=refs[qi],q=r.q,key=`${r.topicId}:${r.index}`;
- document.querySelectorAll(".choice").forEach((b,j)=>{b.disabled=true;if(j===q.a)b.classList.add("ok");if(j===i&&i!==q.a)b.classList.add("no")});
- state.solved++;
- const isCorrect=i===q.a;
- if(isCorrect){state.correct++;state.wrong=state.wrong.filter(x=>x!==key)}
- else{
-   if(!state.wrong.includes(key))state.wrong.push(key);
-   state.hardQuestions.push({topicId:r.topicId,index:r.index,topic:current?.topic||"Deneme",question:q.q,chosen:q.o[i],correct:q.o[q.a],at:new Date().toISOString()});
+function drawQ(){
+ const h=$("#quiz");
+ if(qi>=refs.length){
+   if(examSession&&examSession.active){finishExam();return}
+   h.innerHTML='<div class="feedback"><b>Bu seviye turu bitti.</b></div>';
+   return;
  }
- const d=dayKey();
- state.daily[d]=state.daily[d]||{solved:0,correct:0,topics:{},minutes:0};
- state.daily[d].solved++;
- if(isCorrect)state.daily[d].correct++;
+ const r=refs[qi],q=r.q,k=questionKey(r),saved=state.answers[k];
+ h.innerHTML=`<div class="q">${qi+1}. ${q.q} <span class="level">${difficultyRank(q,qi,refs.length)}</span></div>
+ <div class="choices">${q.o.map((x,i)=>`<button class="choice" onclick="answer(${i})">${"ABCD"[i]}) ${x}</button>`).join("")}</div>
+ <div id="feed"></div>`;
+ if(saved){
+   showAnswered(saved.selected,false);
+ }
+}
+function applyAnswerDelta(r,selected,delta){
+ const q=r.q,isCorrect=selected===q.a,d=dayKey();
  const refTopic=DATA.find(x=>x.id===r.topicId);
  const topicName=refTopic?.topic||current?.topic||"Deneme";
  const subjectName=refTopic?.subject||current?.subject||"Deneme";
+ const key=`${r.topicId}:${r.index}`;
+
+ state.solved=Math.max(0,state.solved+delta);
+ if(isCorrect)state.correct=Math.max(0,state.correct+delta);
+
+ state.daily[d]=state.daily[d]||{solved:0,correct:0,topics:{},minutes:0};
+ state.daily[d].solved=Math.max(0,(state.daily[d].solved||0)+delta);
+ if(isCorrect)state.daily[d].correct=Math.max(0,(state.daily[d].correct||0)+delta);
  state.daily[d].topics=state.daily[d].topics||{};
- state.daily[d].topics[topicName]=(state.daily[d].topics[topicName]||0)+1;
+ state.daily[d].topics[topicName]=Math.max(0,(state.daily[d].topics[topicName]||0)+delta);
+
  state.topicStats[topicName]=state.topicStats[topicName]||{solved:0,correct:0};
- state.topicStats[topicName].solved++; if(isCorrect)state.topicStats[topicName].correct++;
+ state.topicStats[topicName].solved=Math.max(0,state.topicStats[topicName].solved+delta);
+ if(isCorrect)state.topicStats[topicName].correct=Math.max(0,state.topicStats[topicName].correct+delta);
+
  state.topicHistory[topicName]=state.topicHistory[topicName]||[];
- state.topicHistory[topicName].push(isCorrect);
+ if(delta>0)state.topicHistory[topicName].push(isCorrect);
+ else if(state.topicHistory[topicName].length)state.topicHistory[topicName].pop();
  state.topicHistory[topicName]=state.topicHistory[topicName].slice(-200);
  syncLearnedState(topicName);
- if(examSession&&examSession.active){
-   examSession.byTopic[topicName]=examSession.byTopic[topicName]||{solved:0,correct:0,subject:subjectName};
-   examSession.byTopic[topicName].solved++; if(isCorrect)examSession.byTopic[topicName].correct++;
-   examSession.bySubject[subjectName]=examSession.bySubject[subjectName]||{solved:0,correct:0};
-   examSession.bySubject[subjectName].solved++; if(isCorrect)examSession.bySubject[subjectName].correct++;
+
+ if(delta>0){
+   if(isCorrect)state.wrong=state.wrong.filter(x=>x!==key);
+   else{
+     if(!state.wrong.includes(key))state.wrong.push(key);
+     state.hardQuestions.push({answerKey:questionKey(r),topicId:r.topicId,index:r.index,topic:topicName,question:q.q,chosen:q.o[selected],correct:q.o[q.a],at:new Date().toISOString()});
+   }
+   state.studyLog.push({type:"question",topic:topicName,subject:subjectName,correct:isCorrect,at:new Date().toISOString()});
+ }else{
+   state.studyLog.pop();
+   if(!isCorrect){
+     state.wrong=state.wrong.filter(x=>x!==key);
+     state.hardQuestions=state.hardQuestions.filter(x=>x.answerKey!==questionKey(r));
+   }
  }
- state.studyLog.push({type:"question",topic:topicName,subject:subjectName,correct:isCorrect,at:new Date().toISOString()});
- save();
+}
+function showAnswered(selected,counted=true){
+ const r=refs[qi],q=r.q,isCorrect=selected===q.a;
+ document.querySelectorAll(".choice").forEach((b,j)=>{
+   b.disabled=true;
+   b.classList.remove("ok","no");
+   if(j===q.a)b.classList.add("ok");
+   if(j===selected&&selected!==q.a)b.classList.add("no");
+ });
  $("#feed").innerHTML=`<div class="feedback"><b>${isCorrect?"Doğru ✓":"Yanlış"}</b><br>${q.e}</div>
  <div class="tools">
+ <button class="btn" onclick="changeAnswer()">↩️ cevabı değiştir</button>
  <button class="btn" onclick="simple()">🧩 en basit anlat</button>
  <button class="btn" onclick="deep()">🆘 hiç anlamadım</button>
  <button class="btn" onclick="why()">❌ neden bu şık değil?</button>
  <button class="btn" onclick="next()">sonraki</button>
- </div><div id="tool"></div>`
+ </div><div id="tool"></div>`;
+}
+window.answer=i=>{
+ const r=refs[qi],k=questionKey(r);
+ if(state.answers[k])return;
+ state.answers[k]={selected:i,at:Date.now()};
+ applyAnswerDelta(r,i,1);
+ state.progress[progressKey(r.topicId,state.difficulty)]=qi;
+ save();
+ showAnswered(i,true);
+}
+window.changeAnswer=()=>{
+ const r=refs[qi],k=questionKey(r),saved=state.answers[k];
+ if(!saved)return;
+ applyAnswerDelta(r,saved.selected,-1);
+ delete state.answers[k];
+ save();
+ drawQ();
 }
 window.simple=()=>{const q=refs[qi].q;$("#tool").innerHTML=`<div class="simple"><b>Şöyle düşün:</b><br>1) Soru ${current.topic} konusundan.<br>2) Önce anahtar bilgiyi bul.<br>3) Kullanacağın kural: ${q.e}<br>4) Doğru seçenek: <b>${q.o[q.a]}</b>.</div>`}
 window.why=()=>{
@@ -391,7 +642,13 @@ window.miniAnswer=(btn,i,a)=>{
  document.querySelectorAll(".miniOpt").forEach((b,j)=>{b.disabled=true;if(j===a)b.style.outline="2px solid #5f9a70";if(j===i&&i!==a)b.style.outline="2px solid var(--red)"});
  $("#miniFeed").innerHTML=`<div class="feedback">${i===a?"Doğru. Şimdi ana soruya aynı mantıkla bak.":"Burada amaç kuralı en küçük örnekte görmek. Doğru seçenek "+("ABCD"[a])+"."}</div>`;
 }
-window.next=()=>{qi++;drawQ()}
+window.next=()=>{
+ const r=refs[qi];
+ qi++;
+ if(r&&r.topicId)state.progress[progressKey(r.topicId,state.difficulty)]=qi;
+ save();
+ drawQ();
+}
 
 function poolFor(subj,n){let a=[];DATA.filter(t=>!subj||t.subject===subj).forEach(t=>makeQuestions(t,Math.min(t.target,80)).forEach((q,i)=>a.push({q,topicId:t.id,index:i,subject:t.subject})));return a.sort(()=>Math.random()-.5).slice(0,n)}
 function custom(ref,title){
@@ -536,6 +793,8 @@ $("#geoMap").onclick=()=>{
 }
 $("#search").oninput=()=>render();$("#close").onclick=()=>{document.querySelector(".dialog").classList.remove("geoDialog");$("#modal").classList.remove("show")};$("#modal").onclick=e=>{if(e.target.id==="modal"){document.querySelector(".dialog").classList.remove("geoDialog");$("#modal").classList.remove("show")}}
 $("#theme").value=state.theme||"sage";document.body.dataset.theme=$("#theme").value;$("#theme").onchange=e=>{state.theme=e.target.value;document.body.dataset.theme=state.theme;save()}
+window.addEventListener("pagehide",()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}});
 subs();render();stats();countdown();listen();
 </script>
 </body></html>
