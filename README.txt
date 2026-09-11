@@ -1,19 +1,8 @@
-EROL KPSS ÖNLİSANS 2026 • TAM KAYNAK SÜRÜMÜ
+Firebase config bağlandı.
 
-Yeni özellik:
-- Her soru cevabından sonra “bana en basit haliyle anlat” butonu
-- Sorunun ne istediğini, kullanılacak kuralı, ipucunu ve doğru cevabı ayrı adımlarla anlatır
-- Matematikte işlem mantığına, sözel derslerde anahtar bilgiye odaklanır
+GitHub'da mevcut index.html dosyasını bu paketteki index.html ile değiştir.
 
-Mevcut:
-- 67 konu
-- 201 mini test sorusu
-- konu/alt konu notları
-- yanlışlarım
-- karışık test
-- günlük 5 konu
-- ilerleme
-- dark mode
-- mobil görünüm
+Son kontrol:
+Firebase Console > Firestore Database > Rules bölümünde /kpss için read/write izni olmalı ve Publish'e basılmış olmalı.
 
-Bu paket internet bağlantısı olmadan da temel çalışma içeriğini açabilir.
+Erol soru çözdüğünde Firestore > Data altında kpss koleksiyonu oluşacaktır.
