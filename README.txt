@@ -1,15 +1,18 @@
-EROL KPSS • HARİTA MODU DÜZELTİLDİ
+EROL KPSS • USTALIK + ATLAS V2
 
-Sorun:
-Önceki sürüm haritayı assets/turkiye-bolgeler.png dosyasından çağırıyordu.
-GitHub'a yalnız index.html yüklendiği için görsel 404 veriyor ve ekranda alt metin görünüyordu.
+Konu ustalığı:
+- Son 20 cevap kullanılır.
+- 🟥 zayıf: %60 altı
+- 🟨 gelişiyor: %60-79 veya henüz 10 soru yok
+- 🟩 öğrendi: en az 10 soru ve %80+
+- Başarı sonradan düşerse “öğrendi” statüsü ve tamamlandı işareti geri alınır.
+- Firebase ile topicHistory senkronlanır.
 
-Düzeltme:
-- Harita doğrudan index.html içine SVG olarak gömüldü.
-- Artık assets klasörüne ihtiyaç yok.
-- GitHub Pages'te tek index.html ile çalışır.
-- Harita modalı daha geniş açılır.
-- Mevcut arayüz korunmuştur.
+Coğrafya:
+- Eski renkli blok harita kaldırıldı.
+- Daha sade, atlas tarzı tek renk Türkiye görünümü.
+- Bölgeler / Madenler / Tarım / İklim noktaları.
+- Haritada Sor: soruya göre doğru noktaya tıklama.
+- Sağdaki uzun kart sütunu kaldırıldı.
 
-GitHub:
-Mevcut index.html dosyasını bu paketteki index.html ile değiştir.
+Genel arayüz korunmuştur.
