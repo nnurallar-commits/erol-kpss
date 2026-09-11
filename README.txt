@@ -1,19 +1,23 @@
-EROL KPSS • GERİ SAYIMLI FIREBASE SÜRÜMÜ
+EROL KPSS 2026 • KONU VE SORU DAĞILIMINA UYUMLU SÜRÜM
 
-Yeni:
-- 4 Ekim 2026 KPSS Önlisans için otomatik gün sayacı
-- Kalan konu sayısı
-- Tamamlanan konu sayısı
-- Kalan güne göre günlük soru hedefi
-- Son haftaya yaklaştıkça tempo önerisi otomatik değişir
+Sınav yapısı:
+Türkçe 30
+Matematik-Geometri 30
+Tarih 27
+Coğrafya 18
+Vatandaşlık 9
+Güncel Bilgiler 6
+Toplam 120 soru / 130 dakika
 
-Mevcut:
-- Firebase ortak takip
-- Erol çalışma modu
-- Nisu takip paneli
-- 50+ soru/konu
+Bu sürümde:
+- Konular 2026 Önlisans konu listesine göre yeniden gruplandı.
+- Ağırlığı yüksek konulara daha yüksek soru hedefi verildi.
+- 120 soruluk tam deneme gerçek ders dağılımıyla oluşturulur.
+- Günlük plan ağırlığı yüksek ve bitmemiş konuları öne taşır.
 - 12 pastel tema
-- yanlışlar / benzer soru / basit anlatım
+- Firebase ortak takip / Nisu paneli
+- Sınava geri sayım
+- Her konuda 60+ pratik soru hedefi
+- Basit anlatım ve şık açıklaması
 
-GitHub:
-index.html dosyasını mevcut repo içindeki index.html ile değiştir.
+Not: Alt konu soru sayıları geçmiş sınav analizlerine dayalı yaklaşık ağırlıklardır; ÖSYM her alt konu için sabit soru sayısı taahhüt etmez.
