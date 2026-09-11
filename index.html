@@ -100,6 +100,12 @@ button,select,input{font:inherit}.shell{max-width:1240px;margin:auto;padding:16p
  .atlasSvg{min-height:280px}
 }
 
+
+.diffRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.diffBtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 12px;border-radius:12px;font-weight:900;cursor:pointer}
+.diffBtn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.diffHint{font-size:12px;color:var(--muted);margin-top:6px}
+
 </style>
 </head>
 <body data-theme="sage">
@@ -132,6 +138,7 @@ if(!Array.isArray(state.studyLog))state.studyLog=[];
 if(!Array.isArray(state.hardQuestions))state.hardQuestions=[];
 if(!state.topicStats||typeof state.topicStats!=="object")state.topicStats={};
 if(!state.topicHistory||typeof state.topicHistory!=="object")state.topicHistory={};
+if(!state.difficulty)state.difficulty="Karışık";
 if(!Array.isArray(state.examHistory))state.examHistory=[];
 if(!state.sessionStartedAt)state.sessionStartedAt=Date.now();
 let selected="Tümü",current=null,refs=[],qi=0,examSession=null;
@@ -242,13 +249,41 @@ function makeQuestions(t,count=60){
   }
   return out;
 }
+
+function difficultyRank(q,i,total){
+ if(q&&q.level)return q.level;
+ const r=i/Math.max(1,total);
+ if(r<0.34)return "Kolay";
+ if(r<0.67)return "Orta";
+ return "Zor";
+}
+function applyDifficulty(list){
+ if(state.difficulty==="Karışık")return list;
+ return list.filter((r,i)=>difficultyRank(r.q,i,list.length)===state.difficulty);
+}
+function difficultyBar(){
+ return `<div class="diffRow">
+   ${["Karışık","Kolay","Orta","Zor"].map(x=>`<button class="diffBtn ${state.difficulty===x?"on":""}" onclick="setDifficulty('${x}')">${x}</button>`).join("")}
+ </div><div class="diffHint">Erol istediği seviyeyi seçebilir. Karışık mod tüm seviyeleri birlikte getirir.</div>`;
+}
+window.setDifficulty=x=>{
+ state.difficulty=x;
+ localStorage.setItem(KEY,JSON.stringify(state));
+ document.querySelectorAll(".diffBtn").forEach(b=>b.classList.toggle("on",b.textContent===x));
+ if(current&&current.id){
+   refs=applyDifficulty(makeQuestions(current,current.target).map((q,i)=>({q,topicId:current.id,index:i})));
+   qi=0;
+   drawLesson();
+ }
+}
+
 window.openTopic=id=>{
  current=DATA.find(x=>x.id===id);
  state.studyLog.push({type:"topic",topic:current.topic,subject:current.subject,at:new Date().toISOString()});
- refs=makeQuestions(current,current.target).map((q,i)=>({q,topicId:id,index:i}));
+ refs=applyDifficulty(makeQuestions(current,current.target).map((q,i)=>({q,topicId:id,index:i})));
  qi=0;save();drawLesson();$("#modal").classList.add("show")
 }
-function drawLesson(){$("#body").innerHTML=`<div class="eyebrow">${current.subject} • AĞIRLIK ${current.weight}</div><h2>${current.topic}</h2><p class="muted">${current.summary}</p><h4>Hızlı notlar</h4><ul>${current.tips.map(x=>`<li>${x}</li>`).join("")}</ul><div id="quiz"></div>`;drawQ()}
+function drawLesson(){$("#body").innerHTML=`<div class="eyebrow">${current.subject} • AĞIRLIK ${current.weight}</div><h2>${current.topic}</h2><p class="muted">${current.summary}</p>${difficultyBar()}<h4>Hızlı notlar</h4><ul>${current.tips.map(x=>`<li>${x}</li>`).join("")}</ul><div id="quiz"></div>`;drawQ()}
 function drawQ(){const h=$("#quiz");if(qi>=refs.length){if(examSession&&examSession.active){finishExam();return}h.innerHTML='<div class="feedback"><b>Bu konu turu bitti.</b></div>';return}const q=refs[qi].q;h.innerHTML=`<div class="q">${qi+1}. ${q.q} <span class="level">${q.level}</span></div><div class="choices">${q.o.map((x,i)=>`<button class="choice" onclick="answer(${i})">${"ABCD"[i]}) ${x}</button>`).join("")}</div><div id="feed"></div>`}
 window.answer=i=>{
  const r=refs[qi],q=r.q,key=`${r.topicId}:${r.index}`;
@@ -364,7 +399,7 @@ function finishExam(){
  examSession.active=false;
 }
 $("#fullExam").onclick=()=>{let all=[];Object.entries(EXAM).forEach(([s,n])=>all.push(...poolFor(s,n)));custom(all,"120 soruluk tam KPSS denemesi • 130 dk")}
-$("#branchExam").onclick=()=>{const s=selected==="Tümü"?"Türkçe":selected;custom(poolFor(s,EXAM[s]||30),s+" branş denemesi")}
+$("#branchExam").onclick=()=>{const s=selected==="Tümü"?"Türkçe":selected;custom(applyDifficulty(poolFor(s,EXAM[s]||30)),s+" branş denemesi • "+state.difficulty)}
 $("#wrong").onclick=()=>{let all=[];DATA.forEach(t=>makeQuestions(t,Math.min(t.target,80)).forEach((q,i)=>{if(state.wrong.includes(`${t.id}:${i}`))all.push({q,topicId:t.id,index:i})}));custom(all,"Yanlışlarım")}
 $("#daily").onclick=()=>{const a=[...DATA].filter(x=>!state.done.includes(x.id)).sort((a,b)=>b.weight-a.weight).slice(0,6);selected="Tümü";subs();render(a);$("#title").textContent="Bugünün ağırlıklı planı";$("#info").textContent="Soru dağılımı yüksek ve bitmemiş konular öne alındı."}
 

@@ -1,17 +1,8 @@
-EROL KPSS • DÜZELTİLMİŞ SÜRÜM
+EROL KPSS • ZORLUK SEÇİMİ
 
-Düzeltmeler:
-- Konu kartlarının kaybolmasına neden olan topicHistory hatası giderildi.
-- Eski localStorage verisi olan cihazlarda da konu kartları görünür.
-- Gerçek konu ustalığı sistemi korunur:
-  🟥 zayıf / 🟨 gelişiyor / 🟩 öğrendi
-  Son 20 soru baz alınır; başarı düşerse statü geri alınır.
-- Coğrafya haritası yeniden yapıldı:
-  gerçek Türkiye ülke sınırı koordinatlarından oluşturulan SVG silüet,
-  bölgeler/madenler/tarım/iklim katmanları,
-  temiz nokta ve etiket sistemi,
-  Haritada Sor modu.
-- Genel arayüz değiştirilmedi.
-
-GitHub:
-Mevcut index.html dosyasını bununla değiştirip commit et.
+Yeni:
+- Karışık / Kolay / Orta / Zor seçenekleri
+- Seçim kaydedilir
+- Konu soru havuzu seçilen seviyeye göre filtrelenir
+- Branş denemesinde de seçili seviye kullanılır
+- Mevcut arayüz korunmuştur
