@@ -48,6 +48,9 @@ button,select,input{font:inherit}.shell{max-width:1240px;margin:auto;padding:16p
 .badge{font-size:10px;font-weight:900;padding:4px 7px;border-radius:999px;background:var(--a2);color:var(--a)}
 @media(max-width:700px){.detailGrid{grid-template-columns:1fr 1fr}}
 
+
+.masteryNote{font-size:11px;color:var(--muted);margin-top:6px}.locked{opacity:.65}.examAnalysis{margin-top:12px}.analysisRow{display:grid;grid-template-columns:1fr 70px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.analysisBar{height:8px;background:var(--line);border-radius:999px;overflow:hidden}.analysisFill{height:100%;background:var(--a)}.sevenChart{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:170px;margin-top:12px;padding-top:12px}.dayCol{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}.dayBar{width:100%;max-width:38px;min-height:4px;background:var(--a);border-radius:9px 9px 3px 3px}.dayCol small{font-size:10px;color:var(--muted)}.mapMode{display:grid;grid-template-columns:1.7fr .8fr;gap:12px}.mapVisual{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:10px}.mapVisual img{width:100%;display:block;border-radius:12px}.mapTabs{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.mapTab{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 11px;border-radius:11px;cursor:pointer;font-weight:800}.mapTab.on{background:var(--a2);color:var(--a)}.geoCards{display:grid;gap:8px}.geoCard{padding:12px;border:1px solid var(--line);background:var(--bg);border-radius:12px;line-height:1.45}.geoCard b{display:block;margin-bottom:4px}.geoQuiz{margin-top:12px;padding:12px;border:1px dashed var(--a);border-radius:12px}.mapLegend{font-size:12px;color:var(--muted);margin-top:7px}@media(max-width:800px){.mapMode{grid-template-columns:1fr}.sevenChart{height:145px}}
+
 </style>
 </head>
 <body data-theme="sage">
@@ -63,7 +66,7 @@ button,select,input{font:inherit}.shell{max-width:1240px;margin:auto;padding:16p
 <div class="stats"><div class="stat card"><span>Tamamlanan konu</span><b id="doneN">0</b></div><div class="stat card"><span>Çözülen</span><b id="solvedN">0</b></div><div class="stat card"><span>Doğruluk</span><b id="acc">%0</b></div><div class="stat card"><span>Bugün</span><b id="todayN">0 soru</b></div></div>
 
 <div class="layout">
-<aside class="side card"><input class="search" id="search" placeholder="konu ara…"><div class="subs" id="subs"></div><div class="sideActions"><button class="btn primary" id="fullExam">120 soruluk tam deneme</button><button class="btn" id="branchExam">30 soruluk branş denemesi</button><button class="btn" id="wrong">Yanlışlarım</button><button class="btn accent" id="daily">Bugünün ağırlıklı planı</button><button class="btn" id="parent">Nisu takip görünümü</button></div></aside>
+<aside class="side card"><input class="search" id="search" placeholder="konu ara…"><div class="subs" id="subs"></div><div class="sideActions"><button class="btn primary" id="fullExam">120 soruluk tam deneme</button><button class="btn" id="branchExam">30 soruluk branş denemesi</button><button class="btn" id="wrong">Yanlışlarım</button><button class="btn accent" id="daily">Bugünün ağırlıklı planı</button><button class="btn" id="geoMap">🗺️ Coğrafya harita modu</button><button class="btn" id="parent">Nisu takip görünümü</button></div></aside>
 <main><section class="head card"><div class="eyebrow" id="ey">TÜM KONULAR</div><h2 id="title">2026 konu haritası</h2><div class="muted" id="info"></div></section><div class="grid" id="grid"></div></main>
 </div>
 </div>
@@ -75,11 +78,13 @@ const EXAM={"Türkçe": 30, "Matematik": 30, "Tarih": 27, "Coğrafya": 18, "Vata
 const firebaseConfig={apiKey:"AIzaSyByuwrVAsgeviQ_0FgMpuVNcXQWTc88knY",authDomain:"erol-kpss.firebaseapp.com",projectId:"erol-kpss",storageBucket:"erol-kpss.firebasestorage.app",messagingSenderId:"391683325816",appId:"1:391683325816:web:2e0a4250ba065f6318528d",measurementId:"G-3433QE62PT"};
 let db=null; try{firebase.initializeApp(firebaseConfig);db=firebase.firestore()}catch(e){console.warn(e)}
 const KEY="erol-kpss-kitapsec-v1";
-const state=JSON.parse(localStorage.getItem(KEY)||'{"done":[],"solved":0,"correct":0,"wrong":[],"theme":"sage","daily":{},"studyLog":[],"hardQuestions":[],"sessionStartedAt":null}');
+const state=JSON.parse(localStorage.getItem(KEY)||'{"done":[],"solved":0,"correct":0,"wrong":[],"theme":"sage","daily":{},"studyLog":[],"hardQuestions":[],"sessionStartedAt":null,"topicStats":{},"examHistory":[]}');
 if(!Array.isArray(state.studyLog))state.studyLog=[];
 if(!Array.isArray(state.hardQuestions))state.hardQuestions=[];
+if(!state.topicStats||typeof state.topicStats!=="object")state.topicStats={};
+if(!Array.isArray(state.examHistory))state.examHistory=[];
 if(!state.sessionStartedAt)state.sessionStartedAt=Date.now();
-let selected="Tümü",current=null,refs=[],qi=0;
+let selected="Tümü",current=null,refs=[],qi=0,examSession=null;
 const $=s=>document.querySelector(s);
 function dayKey(){const d=new Date();return d.toISOString().slice(0,10)}
 function save(){
@@ -88,17 +93,27 @@ function save(){
  if(typeof studyMinutesToday==="function")state.daily[d].minutes=studyMinutesToday();
  localStorage.setItem(KEY,JSON.stringify(state));stats();pushCloud()
 }
-function pushCloud(){if(!db)return;const d=dayKey();db.collection("kpss").doc("erol-kpss-progress").set({done:state.done,solved:state.solved,correct:state.correct,wrong:state.wrong,theme:state.theme,daily:state.daily,studyLog:state.studyLog.slice(-250),hardQuestions:state.hardQuestions.slice(-120),sessionStartedAt:state.sessionStartedAt,lastStudyAt:new Date().toISOString(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(()=>{})}
+function pushCloud(){if(!db)return;const d=dayKey();db.collection("kpss").doc("erol-kpss-progress").set({done:state.done,solved:state.solved,correct:state.correct,wrong:state.wrong,theme:state.theme,daily:state.daily,studyLog:state.studyLog.slice(-250),hardQuestions:state.hardQuestions.slice(-120),sessionStartedAt:state.sessionStartedAt,topicStats:state.topicStats,examHistory:state.examHistory.slice(-20),lastStudyAt:new Date().toISOString(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(()=>{})}
 function listen(){if(!db)return;db.collection("kpss").doc("erol-kpss-progress").onSnapshot(s=>{if(!s.exists)return;const x=s.data();["done","wrong"].forEach(k=>{if(Array.isArray(x[k]))state[k]=x[k]});["solved","correct"].forEach(k=>{if(Number.isFinite(x[k]))state[k]=x[k]});if(x.daily)state.daily=x.daily;
 if(Array.isArray(x.studyLog))state.studyLog=x.studyLog;
 if(Array.isArray(x.hardQuestions))state.hardQuestions=x.hardQuestions;
 if(x.sessionStartedAt)state.sessionStartedAt=x.sessionStartedAt;
+if(x.topicStats)state.topicStats=x.topicStats;
+if(Array.isArray(x.examHistory))state.examHistory=x.examHistory;
 stats();render()})}
 function stats(){$("#doneN").textContent=state.done.length;$("#solvedN").textContent=state.solved;$("#acc").textContent=state.solved?`%${Math.round(state.correct/state.solved*100)}`:"%0";const d=state.daily[dayKey()]||{solved:0};$("#todayN").textContent=(d.solved||0)+" soru";$("#bar").style.width=Math.round(state.done.length/DATA.length*100)+"%"}
 function countdown(){const exam=new Date("2026-10-04T10:15:00+03:00");$("#days").textContent=Math.max(0,Math.ceil((exam-new Date())/86400000))}
 function subs(){const a=["Tümü",...Object.keys(EXAM)];$("#subs").innerHTML=a.map(s=>`<button class="sub ${s===selected?"active":""}" data-s="${s}"><span>${s}</span><b>${s==="Tümü"?DATA.length:DATA.filter(x=>x.subject===s).length}</b></button>`).join("");document.querySelectorAll(".sub").forEach(b=>b.onclick=()=>{selected=b.dataset.s;subs();render()})}
-function render(list=null){let a=list||DATA.filter(x=>(selected==="Tümü"||x.subject===selected)&&(`${x.topic} ${x.subject}`.toLocaleLowerCase("tr").includes($("#search").value.toLocaleLowerCase("tr"))));$("#ey").textContent=selected==="Tümü"?"TÜM KONULAR":selected.toLocaleUpperCase("tr");$("#title").textContent=selected==="Tümü"?"2026 konu haritası":selected+" konuları";$("#info").textContent=`${a.length} konu • ağırlığı yüksek başlıklarda soru hedefi artırıldı`;$("#grid").innerHTML=a.map(x=>{const done=state.done.includes(x.id);return `<article class="topic card"><div class="eyebrow">${x.subject} • yaklaşık ağırlık ${x.weight}</div><h3>${x.topic}</h3><p>${x.summary}</p><div class="chips"><span class="chip">hedef ${x.target}+ soru</span><span class="chip">${done?"tamamlandı ✓":"çalışılıyor"}</span></div><div class="topicActions"><button class="open" onclick="openTopic(${x.id})">konuyu aç</button><button class="tick" onclick="toggle(${x.id})">${done?"✓":"○"}</button></div></article>`}).join("")}
-window.toggle=id=>{state.done.includes(id)?state.done=state.done.filter(x=>x!==id):state.done.push(id);save();render()}
+function render(list=null){let a=list||DATA.filter(x=>(selected==="Tümü"||x.subject===selected)&&(`${x.topic} ${x.subject}`.toLocaleLowerCase("tr").includes($("#search").value.toLocaleLowerCase("tr"))));$("#ey").textContent=selected==="Tümü"?"TÜM KONULAR":selected.toLocaleUpperCase("tr");$("#title").textContent=selected==="Tümü"?"2026 konu haritası":selected+" konuları";$("#info").textContent=`${a.length} konu • ağırlığı yüksek başlıklarda soru hedefi artırıldı`;$("#grid").innerHTML=a.map(x=>{const done=state.done.includes(x.id);return `<article class="topic card"><div class="eyebrow">${x.subject} • yaklaşık ağırlık ${x.weight}</div><h3>${x.topic}</h3><p>${x.summary}</p><div class="chips"><span class="chip">hedef ${x.target}+ soru</span><span class="chip">${done?"tamamlandı ✓":"çalışılıyor"}</span><span class="chip">ustalık %${(()=>{const s=state.topicStats[x.topic]||{solved:0,correct:0};return s.solved?Math.round(s.correct/s.solved*100):0})()}</span></div><div class="masteryNote">Tamamlanma kilidi: en az 10 soru + %70 başarı.</div><div class="topicActions"><button class="open" onclick="openTopic(${x.id})">konuyu aç</button><button class="tick" onclick="toggle(${x.id})">${done?"✓":"○"}</button></div></article>`}).join("")}
+window.toggle=id=>{
+ const t=DATA.find(x=>x.id===id), s=state.topicStats[t.topic]||{solved:0,correct:0};
+ const pct=s.solved?Math.round(s.correct/s.solved*100):0;
+ if(state.done.includes(id)){state.done=state.done.filter(x=>x!==id);save();render();return}
+ if(s.solved<10||pct<70){
+   alert(`Bu konu henüz tamamlanamaz. En az 10 soru çöz ve başarıyı %70'e çıkar. Şu an: ${s.solved} soru • %${pct}`);return;
+ }
+ state.done.push(id);save();render();
+}
 function makeQuestions(t,count=60){
   if(t.subject!=="Matematik"){
     const out=[];for(let i=0;i<count;i++){const tip=t.tips[i%t.tips.length],lv=i<count/3?"Kolay":i<2*count/3?"Orta":"KPSS ayarı";let o=[tip,"Soruyu okumadan tahmin etmek","Konu bilgisini görmezden gelmek","Her seçeneği doğru kabul etmek"];const shift=(i+t.id)%4,c=o[0];o=o.slice(shift).concat(o.slice(0,shift));out.push({q:`${t.topic} konusunda bu soruyu çözerken hangi yaklaşım daha doğrudur?`,o,a:o.indexOf(c),e:tip,level:lv})}return out
@@ -144,7 +159,7 @@ window.openTopic=id=>{
  qi=0;save();drawLesson();$("#modal").classList.add("show")
 }
 function drawLesson(){$("#body").innerHTML=`<div class="eyebrow">${current.subject} • AĞIRLIK ${current.weight}</div><h2>${current.topic}</h2><p class="muted">${current.summary}</p><h4>Hızlı notlar</h4><ul>${current.tips.map(x=>`<li>${x}</li>`).join("")}</ul><div id="quiz"></div>`;drawQ()}
-function drawQ(){const h=$("#quiz");if(qi>=refs.length){h.innerHTML='<div class="feedback"><b>Bu konu turu bitti.</b></div>';return}const q=refs[qi].q;h.innerHTML=`<div class="q">${qi+1}. ${q.q} <span class="level">${q.level}</span></div><div class="choices">${q.o.map((x,i)=>`<button class="choice" onclick="answer(${i})">${"ABCD"[i]}) ${x}</button>`).join("")}</div><div id="feed"></div>`}
+function drawQ(){const h=$("#quiz");if(qi>=refs.length){if(examSession&&examSession.active){finishExam();return}h.innerHTML='<div class="feedback"><b>Bu konu turu bitti.</b></div>';return}const q=refs[qi].q;h.innerHTML=`<div class="q">${qi+1}. ${q.q} <span class="level">${q.level}</span></div><div class="choices">${q.o.map((x,i)=>`<button class="choice" onclick="answer(${i})">${"ABCD"[i]}) ${x}</button>`).join("")}</div><div id="feed"></div>`}
 window.answer=i=>{
  const r=refs[qi],q=r.q,key=`${r.topicId}:${r.index}`;
  document.querySelectorAll(".choice").forEach((b,j)=>{b.disabled=true;if(j===q.a)b.classList.add("ok");if(j===i&&i!==q.a)b.classList.add("no")});
@@ -159,10 +174,20 @@ window.answer=i=>{
  state.daily[d]=state.daily[d]||{solved:0,correct:0,topics:{},minutes:0};
  state.daily[d].solved++;
  if(isCorrect)state.daily[d].correct++;
- const topicName=current?.topic||"Deneme";
+ const refTopic=DATA.find(x=>x.id===r.topicId);
+ const topicName=refTopic?.topic||current?.topic||"Deneme";
+ const subjectName=refTopic?.subject||current?.subject||"Deneme";
  state.daily[d].topics=state.daily[d].topics||{};
  state.daily[d].topics[topicName]=(state.daily[d].topics[topicName]||0)+1;
- state.studyLog.push({type:"question",topic:topicName,subject:current?.subject||"Deneme",correct:isCorrect,at:new Date().toISOString()});
+ state.topicStats[topicName]=state.topicStats[topicName]||{solved:0,correct:0};
+ state.topicStats[topicName].solved++; if(isCorrect)state.topicStats[topicName].correct++;
+ if(examSession&&examSession.active){
+   examSession.byTopic[topicName]=examSession.byTopic[topicName]||{solved:0,correct:0,subject:subjectName};
+   examSession.byTopic[topicName].solved++; if(isCorrect)examSession.byTopic[topicName].correct++;
+   examSession.bySubject[subjectName]=examSession.bySubject[subjectName]||{solved:0,correct:0};
+   examSession.bySubject[subjectName].solved++; if(isCorrect)examSession.bySubject[subjectName].correct++;
+ }
+ state.studyLog.push({type:"question",topic:topicName,subject:subjectName,correct:isCorrect,at:new Date().toISOString()});
  save();
  $("#feed").innerHTML=`<div class="feedback"><b>${isCorrect?"Doğru ✓":"Yanlış"}</b><br>${q.e}</div>
  <div class="tools">
@@ -227,7 +252,23 @@ window.miniAnswer=(btn,i,a)=>{
 window.next=()=>{qi++;drawQ()}
 
 function poolFor(subj,n){let a=[];DATA.filter(t=>!subj||t.subject===subj).forEach(t=>makeQuestions(t,Math.min(t.target,80)).forEach((q,i)=>a.push({q,topicId:t.id,index:i,subject:t.subject})));return a.sort(()=>Math.random()-.5).slice(0,n)}
-function custom(ref,title){current={subject:"Deneme",topic:title,summary:"Sınav dağılımına göre hazırlanmış test.",tips:["Süreyi kontrollü kullan.","Takıldığın soruda oyalanma.","Deneme sonunda yanlışları tekrar et."]};refs=ref;qi=0;$("#body").innerHTML=`<div class="eyebrow">DENEME MODU</div><h2>${title}</h2><div id="quiz"></div>`;drawQ();$("#modal").classList.add("show")}
+function custom(ref,title){
+ current={subject:"Deneme",topic:title,summary:"Sınav dağılımına göre hazırlanmış test.",tips:["Süreyi kontrollü kullan.","Takıldığın soruda oyalanma.","Deneme sonunda yanlışları tekrar et."]};
+ refs=ref;qi=0;examSession={active:true,title,total:ref.length,startedAt:Date.now(),byTopic:{},bySubject:{}};
+ $("#body").innerHTML=`<div class="eyebrow">DENEME MODU</div><h2>${title}</h2><div id="quiz"></div>`;drawQ();$("#modal").classList.add("show")
+}
+function finishExam(){
+ const total=Object.values(examSession.byTopic).reduce((a,x)=>a+x.solved,0);
+ const correct=Object.values(examSession.byTopic).reduce((a,x)=>a+x.correct,0);
+ const wrong=total-correct, net=(correct-wrong/4).toFixed(2), min=Math.max(1,Math.round((Date.now()-examSession.startedAt)/60000));
+ const topics=Object.entries(examSession.byTopic).map(([name,x])=>({name,...x,pct:Math.round(x.correct/x.solved*100)})).sort((a,b)=>a.pct-b.pct);
+ const subjects=Object.entries(examSession.bySubject).map(([name,x])=>({name,...x,pct:Math.round(x.correct/x.solved*100)})).sort((a,b)=>a.pct-b.pct);
+ state.examHistory.push({title:examSession.title,at:new Date().toISOString(),total,correct,wrong,net,minutes:min,topics:topics.slice(0,20)}); save();
+ $("#quiz").innerHTML=`<div class="feedback"><b>Deneme tamamlandı.</b><br>${correct} doğru • ${wrong} yanlış • ${net} net • ${min} dk</div>
+ <div class="examAnalysis"><h4>Ders analizi</h4>${subjects.map(x=>`<div class="analysisRow"><div><b>${x.name}</b><div class="analysisBar"><div class="analysisFill" style="width:${x.pct}%"></div></div></div><b>%${x.pct}</b></div>`).join("")}
+ <h4>Konu analizi</h4>${topics.map(x=>`<div class="analysisRow"><div><b>${x.name}</b><div class="analysisBar"><div class="analysisFill" style="width:${x.pct}%"></div></div></div><b>%${x.pct}</b></div>`).join("")}</div>`;
+ examSession.active=false;
+}
 $("#fullExam").onclick=()=>{let all=[];Object.entries(EXAM).forEach(([s,n])=>all.push(...poolFor(s,n)));custom(all,"120 soruluk tam KPSS denemesi • 130 dk")}
 $("#branchExam").onclick=()=>{const s=selected==="Tümü"?"Türkçe":selected;custom(poolFor(s,EXAM[s]||30),s+" branş denemesi")}
 $("#wrong").onclick=()=>{let all=[];DATA.forEach(t=>makeQuestions(t,Math.min(t.target,80)).forEach((q,i)=>{if(state.wrong.includes(`${t.id}:${i}`))all.push({q,topicId:t.id,index:i})}));custom(all,"Yanlışlarım")}
@@ -251,26 +292,35 @@ function todayTopics(){
  return Object.entries(t).sort((a,b)=>b[1]-a[1]);
 }
 
+function last7Days(){
+ const a=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10),x=state.daily[k]||{solved:0,correct:0};a.push({k,label:d.toLocaleDateString("tr-TR",{weekday:"short"}),solved:x.solved||0,correct:x.correct||0})}return a;
+}
+function hardestToday(){
+ const arr=state.hardQuestions.filter(x=>x.at&&x.at.slice(0,10)===dayKey());const m={};arr.forEach(x=>m[x.topic]=(m[x.topic]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]?.[0]||"-";
+}
 $("#parent").onclick=()=>{
- const d=state.daily[dayKey()]||{solved:0,correct:0,topics:{}};
- const mins=studyMinutesToday();
- const topics=todayTopics();
- const hard=state.hardQuestions.filter(x=>x.at&&x.at.slice(0,10)===dayKey()).slice(-8).reverse();
- $("#body").innerHTML=`<div class="eyebrow">NİSU TAKİP PANELİ</div><h2>Erol bugün ne yaptı?</h2>
- <div class="detailGrid">
-   <div class="detailBox"><span>Bugün soru</span><b>${d.solved||0}</b></div>
-   <div class="detailBox"><span>Doğru</span><b>${d.correct||0}</b></div>
-   <div class="detailBox"><span>Yanlış</span><b>${(d.solved||0)-(d.correct||0)}</b></div>
-   <div class="detailBox"><span>Çalışma süresi</span><b>${mins} dk</b></div>
-   <div class="detailBox"><span>Biten konu</span><b>${state.done.length}</b></div>
-   <div class="detailBox"><span>Doğruluk</span><b>${d.solved?Math.round((d.correct||0)/d.solved*100):0}%</b></div>
- </div>
- <h4>Bugün çalıştığı konular</h4>
- <div class="logList">${topics.length?topics.map(([name,c])=>`<div class="logItem"><b>${name}</b><br><span class="badge">${c} soru</span></div>`).join(""):"<div class='logItem'>Henüz konu çalışması görünmüyor.</div>"}</div>
- <h4>Zorlandığı sorular</h4>
- <div class="logList">${hard.length?hard.map(x=>`<div class="logItem"><b>${x.topic}</b><br>${x.question}<br><span class="badge">işaretledi: ${x.chosen}</span> <span class="badge">doğru: ${x.correct}</span></div>`).join(""):"<div class='logItem'>Bugün yanlış yaptığı kayıtlı soru yok.</div>"}</div>
- <p class="muted">Bu bilgiler Firebase'e yazılır. Erol başka cihazdan çalışsa da panelde görünür.</p>`;
- $("#modal").classList.add("show")
+ const d=state.daily[dayKey()]||{solved:0,correct:0,topics:{}};const mins=studyMinutesToday();const topics=todayTopics();const hard=state.hardQuestions.filter(x=>x.at&&x.at.slice(0,10)===dayKey()).slice(-8).reverse();const days=last7Days(),max=Math.max(1,...days.map(x=>x.solved)),hardest=hardestToday();
+ $("#body").innerHTML=`<div class="eyebrow">NİSU TAKİP PANELİ</div><h2>Bugün ${d.solved||0} soru / ${d.correct||0} doğru / ${mins} dk</h2><p class="muted">En çok zorlandığı konu: <b>${hardest}</b></p>
+ <div class="detailGrid"><div class="detailBox"><span>Bugün soru</span><b>${d.solved||0}</b></div><div class="detailBox"><span>Doğru</span><b>${d.correct||0}</b></div><div class="detailBox"><span>Yanlış</span><b>${(d.solved||0)-(d.correct||0)}</b></div><div class="detailBox"><span>Çalışma süresi</span><b>${mins} dk</b></div><div class="detailBox"><span>Biten konu</span><b>${state.done.length}</b></div><div class="detailBox"><span>Doğruluk</span><b>${d.solved?Math.round((d.correct||0)/d.solved*100):0}%</b></div></div>
+ <h4>Son 7 gün</h4><div class="sevenChart">${days.map(x=>`<div class="dayCol"><div class="dayBar" title="${x.solved} soru" style="height:${Math.max(4,Math.round(x.solved/max*120))}px"></div><b>${x.solved}</b><small>${x.label}</small></div>`).join("")}</div>
+ <h4>Bugün çalıştığı konular</h4><div class="logList">${topics.length?topics.map(([name,c])=>`<div class="logItem"><b>${name}</b><br><span class="badge">${c} soru</span></div>`).join(""):"<div class='logItem'>Henüz konu çalışması görünmüyor.</div>"}</div>
+ <h4>Zorlandığı sorular</h4><div class="logList">${hard.length?hard.map(x=>`<div class="logItem"><b>${x.topic}</b><br>${x.question}<br><span class="badge">işaretledi: ${x.chosen}</span> <span class="badge">doğru: ${x.correct}</span></div>`).join(""):"<div class='logItem'>Bugün yanlış yaptığı kayıtlı soru yok.</div>"}</div>
+ <p class="muted">Firebase açık olduğu için Erol başka cihazdan çalıştıkça bu bilgiler senkron kalır.</p>`;$("#modal").classList.add("show")
+}
+
+const GEO_DATA={
+ "Bölgeler":[["Marmara","Sanayi, ulaşım ve nüfus yoğunluğu yüksektir."],["Ege","Kıyılar girintili çıkıntılıdır; zeytin ve incir öne çıkar."],["Akdeniz","Yaz kuraklığı belirgin; turunçgil ve seracılık yaygındır."],["İç Anadolu","Karasal iklim ve bozkır; tahıl üretimi önemlidir."],["Karadeniz","Her mevsim yağış; çay ve fındık öne çıkar."],["Doğu Anadolu","Yükselti ve karasallık fazladır; büyükbaş hayvancılık önemlidir."],["Güneydoğu Anadolu","Yaz sıcak ve kurak; GAP sulaması tarımı dönüştürür."]],
+ "Madenler":[["Taş kömürü","Zonguldak çevresi"],["Bor","Eskişehir-Kütahya-Balıkesir çevresi"],["Bakır","Artvin, Kastamonu, Elazığ çevresi"],["Demir","Sivas-Malatya çevresi"],["Boksit","Seydişehir-Akseki çevresi"],["Krom","Elazığ-Guleman ve çevresi"]],
+ "Tarım":[["Çay","Doğu Karadeniz"],["Fındık","Karadeniz kıyıları"],["Zeytin","Ege ve Marmara kıyıları"],["Pamuk","Ege, Çukurova, Güneydoğu"],["Buğday","İç Anadolu başta olmak üzere geniş alanlar"],["Muz","Akdeniz kıyıları"]],
+ "İklim":[["Karadeniz iklimi","Her mevsim yağış; doğal bitki örtüsü orman"],["Akdeniz iklimi","Yaz sıcak-kurak, kış ılık-yağışlı; maki"],["Karasal iklim","Yaz sıcak-kurak, kış soğuk; bozkır yaygın"],["Yükselti etkisi","Doğuya gidildikçe sıcaklık ortalamaları genelde düşer"]]
+};
+let geoTab="Bölgeler";
+function drawGeo(){
+ const cards=GEO_DATA[geoTab]||[];const body=document.querySelector("#geoCards");if(body)body.innerHTML=cards.map(x=>`<div class="geoCard"><b>${x[0]}</b>${x[1]}</div>`).join("");document.querySelectorAll(".mapTab").forEach(b=>b.classList.toggle("on",b.dataset.t===geoTab));
+}
+window.setGeoTab=t=>{geoTab=t;drawGeo()}
+$("#geoMap").onclick=()=>{
+ $("#body").innerHTML=`<div class="eyebrow">COĞRAFYA • GÖRSEL TEKRAR</div><h2>Türkiye harita modu</h2><div class="mapTabs">${Object.keys(GEO_DATA).map(t=>`<button class="mapTab ${t===geoTab?"on":""}" data-t="${t}" onclick="setGeoTab('${t}')">${t}</button>`).join("")}</div><div class="mapMode"><div><div class="mapVisual"><img src="assets/turkiye-bolgeler.png" alt="Türkiye coğrafi bölgeler görseli"><div class="mapLegend">Şematik görsel tekrar. Sınavda konum bilgisini haritayla birlikte düşün.</div></div><div class="geoQuiz"><b>Mini ipucu:</b> Çay → Doğu Karadeniz • Taş kömürü → Zonguldak • Zeytin → Ege/Marmara • Bor → Eskişehir-Kütahya-Balıkesir.</div></div><div class="geoCards" id="geoCards"></div></div>`;drawGeo();$("#modal").classList.add("show")
 }
 $("#search").oninput=()=>render();$("#close").onclick=()=>$("#modal").classList.remove("show");$("#modal").onclick=e=>{if(e.target.id==="modal")$("#modal").classList.remove("show")}
 $("#theme").value=state.theme||"sage";document.body.dataset.theme=$("#theme").value;$("#theme").onchange=e=>{state.theme=e.target.value;document.body.dataset.theme=state.theme;save()}

@@ -1,27 +1,10 @@
-EROL KPSS • GELİŞMİŞ ÖĞRENME + NİSU PANELİ
+EROL KPSS • GELİŞMİŞ ANALİZ + HARİTA MODU
 
-Yeni özellikler:
-1) “Hiç anlamadım” modu
-   - Soruyu daha küçük/basit bir örnekle açıklar
-   - Ardından mini alıştırma verir
-   - Mini alıştırmanın cevabını anında kontrol eder
+Arayüz korunarak eklenenler:
+- Konu öğrenme kilidi: en az 10 soru + %70 başarı olmadan konu tamamlanmaz.
+- Deneme analizi: ders ve konu bazında başarı yüzdesi, net ve süre.
+- Nisu paneli: bugün soru/doğru/yanlış/süre, en çok zorlanılan konu, son 7 gün grafiği, zor sorular.
+- Coğrafya harita modu: Türkiye bölgeleri görseli + madenler, tarım, iklim hızlı tekrar kartları.
+- Firebase senkronuna topicStats ve examHistory eklendi.
 
-2) “Neden bu şık değil?” sistemi
-   - Her seçeneği ayrı ayrı açıklar
-   - Ders türüne göre yanlış şık gerekçesi verir
-   - Doğru şıkkın neden doğru olduğunu ayrıca belirtir
-
-3) Nisu takip paneli
-   - Bugün çözülen soru
-   - Doğru / yanlış
-   - Günlük doğruluk
-   - Yaklaşık aktif çalışma dakikası
-   - Bugün hangi konuları çalıştı
-   - Konu başına kaç soru çözdü
-   - Bugün zorlandığı/yanlış yaptığı son sorular
-   - İşaretlediği şık ve doğru cevap
-   - Biten konu sayısı
-   - Firebase üzerinden ortak senkron
-
-GitHub:
-ZIP içindeki index.html dosyasını erol-kpss reposundaki mevcut index.html ile değiştir.
+GitHub'da mevcut index.html ve assets klasörünü bu pakettekilerle değiştir.
