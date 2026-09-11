@@ -1,20 +1,19 @@
-EROL KPSS ÖNLİSANS • 50+ SORU/KONU SÜRÜMÜ
+EROL KPSS ÖNLİSANS 2026 • TAM KAYNAK SÜRÜMÜ
 
+Yeni özellik:
+- Her soru cevabından sonra “bana en basit haliyle anlat” butonu
+- Sorunun ne istediğini, kullanılacak kuralı, ipucunu ve doğru cevabı ayrı adımlarla anlatır
+- Matematikte işlem mantığına, sözel derslerde anahtar bilgiye odaklanır
+
+Mevcut:
 - 67 konu
-- Her konuda en az 50 soru
-- Tarayıcıda toplam 3.350+ soru
-- Kolay / Orta / Zor-KPSS ayarı etiketleri
-- 12 pastel tema
-- Yanlışlarım
-- 20 soruluk karışık test
-- Benzer soru ekleme
-- En basit haliyle anlat
-- Diğer şıklar neden yanlış
-- Kuralı göster
-- Konu ve ilerleme takibi
-- Mobil uyumlu
+- 201 mini test sorusu
+- konu/alt konu notları
+- yanlışlarım
+- karışık test
+- günlük 5 konu
+- ilerleme
+- dark mode
+- mobil görünüm
 
-Not: Sorular çalışma amaçlı özgün pratik sorularıdır; telifli ÖSYM sorularının birebir kopyaları değildir.
-
-GitHub:
-ZIP'i açıp index.html dosyasını erol-kpss reposundaki mevcut index.html ile değiştir.
+Bu paket internet bağlantısı olmadan da temel çalışma içeriğini açabilir.
